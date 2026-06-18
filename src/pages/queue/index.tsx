@@ -27,8 +27,11 @@ const QueuePage: React.FC = () => {
     fetchMyQueue,
     joinQueue,
     leaveQueue,
+    callNext,
+    expireQueue,
     getPriorityQueue,
     getNormalQueue,
+    getCalledQueue,
     loading,
   } = useQueueStore()
 
@@ -37,6 +40,8 @@ const QueuePage: React.FC = () => {
   const [showModal, setShowModal] = useState(false)
   const [selectedSeatType, setSelectedSeatType] = useState('single')
   const [selectedPriority, setSelectedPriority] = useState<PriorityLevel>('normal')
+  const [showStaffMode, setShowStaffMode] = useState(false)
+  const [, forceUpdate] = useState(0)
 
   useEffect(() => {
     console.log('[QueuePage] 页面初始化')
@@ -52,6 +57,31 @@ const QueuePage: React.FC = () => {
 
   const priorityQueue = useMemo(() => getPriorityQueue(), [getPriorityQueue])
   const normalQueue = useMemo(() => getNormalQueue(), [getNormalQueue])
+  const calledQueue = useMemo(() => getCalledQueue(), [getCalledQueue])
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = new Date().getTime()
+      const timeoutMs = 5 * 60 * 1000
+      let hasExpired = false
+
+      queueItems.forEach(item => {
+        if (item.status === 'called' && item.calledTime) {
+          const calledAt = new Date(item.calledTime).getTime()
+          if (now - calledAt > timeoutMs) {
+            expireQueue(item.id)
+            hasExpired = true
+          }
+        }
+      })
+
+      if (hasExpired) {
+        forceUpdate(n => n + 1)
+      }
+    }, 10000)
+
+    return () => clearInterval(interval)
+  }, [queueItems, expireQueue])
 
   const handleRefresh = () => {
     console.log('[QueuePage] 下拉刷新')
@@ -109,16 +139,89 @@ const QueuePage: React.FC = () => {
     setSelectedPriority(priority)
   }
 
+  const handleCallNext = () => {
+    const next = callNext()
+    if (next) {
+      const priorityText = next.priority === 'emergency' ? '【应急】' : next.priority === 'vip' ? '【VIP】' : ''
+      Taro.showModal({
+        title: '叫号成功',
+        content: `${priorityText}请 ${next.queueNumber} 号用户\n${next.userName}\n前往入座\n座位类型: ${getSeatTypeText(next.seatType)}\n\n5分钟内未入座将自动释放`,
+        showCancel: false,
+        confirmText: '知道了',
+      })
+      forceUpdate(n => n + 1)
+    } else {
+      Taro.showToast({ title: '暂无排队用户', icon: 'none' })
+    }
+  }
+
+  const handleExpireManually = (item: QueueItem) => {
+    Taro.showModal({
+      title: '手动释放',
+      content: `确认将 ${item.queueNumber} 号设置为已过期？\n（超时未入座或放弃座位）`,
+      success: (res) => {
+        if (res.confirm) {
+          expireQueue(item.id)
+          Taro.showToast({ title: '已释放', icon: 'success' })
+          forceUpdate(n => n + 1)
+        }
+      },
+    })
+  }
+
   const isVipUser = isVip()
   const isMyQueueVip = myQueueItem?.isVip
 
   return (
     <View className={styles.page}>
       <View className={styles.header}>
-        <Text className={styles.headerTitle}>排队叫号</Text>
-        <Text className={styles.headerSubtitle}>
-          {myQueueItem ? `您的排名: 第 ${myQueueItem.queueNumber} 位` : '智能排队，高效入座'}
-        </Text>
+        <View className={styles.headerRow}>
+          <View className={styles.headerTitleWrap}>
+            <Text className={styles.headerTitle}>排队叫号</Text>
+            <Text className={styles.headerSubtitle}>
+              {myQueueItem ? `您的排名: 第 ${myQueueItem.queueNumber} 位` : '智能排队，高效入座'}
+            </Text>
+          </View>
+          <Button
+            className={classnames(styles.staffModeBtn, showStaffMode && styles.staffModeBtnActive)}
+            onClick={() => setShowStaffMode(!showStaffMode)}
+          >
+            {showStaffMode ? '返回用户模式' : '店员模式'}
+          </Button>
+        </View>
+
+        {showStaffMode && (
+          <View className={styles.staffPanel}>
+            <View className={styles.staffPanelHeader}>
+              <Text className={styles.staffPanelTitle}>店员叫号控制台</Text>
+            </View>
+            <View className={styles.staffStats}>
+              <View className={styles.staffStatItem}>
+                <Text className={styles.staffStatNum}>{priorityQueue.length}</Text>
+                <Text className={styles.staffStatLabel}>优先级等待</Text>
+              </View>
+              <View className={styles.staffStatItem}>
+                <Text className={styles.staffStatNum}>{normalQueue.length}</Text>
+                <Text className={styles.staffStatLabel}>普通等待</Text>
+              </View>
+              <View className={styles.staffStatItem}>
+                <Text className={styles.staffStatNum}>{calledQueue.filter(c => c.status === 'called').length}</Text>
+                <Text className={styles.staffStatLabel}>待入座</Text>
+              </View>
+              <View className={styles.staffStatItem}>
+                <Text className={styles.staffStatNum}>{calledQueue.filter(c => c.status === 'expired').length}</Text>
+                <Text className={styles.staffStatLabel}>已过期</Text>
+              </View>
+            </View>
+            <Button
+              className={styles.callNextBtn}
+              onClick={handleCallNext}
+              disabled={priorityQueue.length === 0 && normalQueue.length === 0}
+            >
+              🔔 叫下一位
+            </Button>
+          </View>
+        )}
       </View>
 
       {myQueueItem ? (
@@ -240,6 +343,56 @@ const QueuePage: React.FC = () => {
               ))
             )}
           </View>
+
+          {calledQueue.length > 0 && (
+            <View className={styles.queueSection}>
+              <View className={styles.queueSectionTitle}>
+                <Text className={styles.sectionIcon}>🔔</Text>
+                <Text className={styles.sectionName}>叫号记录</Text>
+                <Text className={styles.sectionCount}>{calledQueue.length} 条</Text>
+              </View>
+              {calledQueue.slice(0, 10).map((item) => (
+                <View key={item.id} className={styles.calledCard}>
+                  <View className={styles.calledLeft}>
+                    <View className={styles.calledNumber}>
+                      <Text className={styles.calledNumText}>{item.queueNumber}</Text>
+                      <Text className={styles.calledNumUnit}>号</Text>
+                    </View>
+                  </View>
+                  <View className={styles.calledMiddle}>
+                    <View className={styles.calledUserRow}>
+                      <Text className={styles.calledUserName}>{item.userName}</Text>
+                      <StatusTag
+                        text={getPriorityText(item.priority)}
+                        type={item.priority === 'emergency' ? 'error' : item.priority === 'vip' ? 'vip' : 'default'}
+                        size="small"
+                      />
+                    </View>
+                    <Text className={styles.calledInfo}>
+                      {getSeatTypeText(item.seatType)} · {item.calledTime ? new Date(item.calledTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '--'}
+                    </Text>
+                  </View>
+                  <View className={styles.calledRight}>
+                    {item.status === 'called' ? (
+                      <View className={styles.calledStatusCol}>
+                        <StatusTag text="待入座" type="warning" size="small" />
+                        {showStaffMode && (
+                          <Button
+                            className={styles.expireBtn}
+                            onClick={() => handleExpireManually(item)}
+                          >
+                            超时释放
+                          </Button>
+                        )}
+                      </View>
+                    ) : (
+                      <StatusTag text="已过期" type="error" size="small" />
+                    )}
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
       </ScrollView>
 

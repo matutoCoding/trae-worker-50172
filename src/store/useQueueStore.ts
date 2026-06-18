@@ -7,6 +7,8 @@ interface QueueState {
   queueStats: QueueStats
   myQueueItem: QueueItem | null
   loading: boolean
+  queueInitialized: boolean
+  myQueueInitialized: boolean
 
   setQueueItems: (items: QueueItem[]) => void
   setQueueStats: (stats: QueueStats) => void
@@ -14,8 +16,10 @@ interface QueueState {
   joinQueue: (seatType: string, priority: PriorityLevel) => Promise<QueueItem>
   leaveQueue: (queueId: string) => void
   callNext: () => QueueItem | null
+  expireQueue: (queueId: string) => void
   getPriorityQueue: () => QueueItem[]
   getNormalQueue: () => QueueItem[]
+  getCalledQueue: () => QueueItem[]
   getWaitingCount: () => number
   updateQueueStatus: (queueId: string, status: QueueStatus) => void
   fetchQueue: () => Promise<void>
@@ -32,10 +36,12 @@ const getPriorityWeight = (priority: PriorityLevel): number => {
 }
 
 export const useQueueStore = create<QueueState>((set, get) => ({
-  queueItems: mockQueueItems,
+  queueItems: [],
   queueStats: mockQueueStats,
-  myQueueItem: mockMyQueueItem,
+  myQueueItem: null,
   loading: false,
+  queueInitialized: false,
+  myQueueInitialized: false,
 
   setQueueItems: (items) => set({ queueItems: items }),
 
@@ -60,6 +66,7 @@ export const useQueueStore = create<QueueState>((set, get) => ({
     set((state) => ({
       queueItems: [...state.queueItems, newItem],
       myQueueItem: newItem,
+      myQueueInitialized: true,
       queueStats: {
         ...state.queueStats,
         totalWaiting: state.queueStats.totalWaiting + 1,
@@ -74,9 +81,11 @@ export const useQueueStore = create<QueueState>((set, get) => ({
   leaveQueue: (queueId) => {
     set((state) => {
       const item = state.queueItems.find(q => q.id === queueId)
+      const wasMyQueue = state.myQueueItem?.id === queueId
       return {
         queueItems: state.queueItems.filter(q => q.id !== queueId),
-        myQueueItem: state.myQueueItem?.id === queueId ? null : state.myQueueItem,
+        myQueueItem: wasMyQueue ? null : state.myQueueItem,
+        myQueueInitialized: true,
         queueStats: {
           ...state.queueStats,
           totalWaiting: Math.max(0, state.queueStats.totalWaiting - 1),
@@ -99,8 +108,48 @@ export const useQueueStore = create<QueueState>((set, get) => ({
     if (waitingItems.length === 0) return null
 
     const nextItem = waitingItems[0]
-    get().updateQueueStatus(nextItem.id, 'called')
+    set((state) => ({
+      queueItems: state.queueItems.map(q =>
+        q.id === nextItem.id
+          ? { ...q, status: 'called' as QueueStatus, calledTime: new Date().toISOString() }
+          : q
+      ),
+      myQueueItem: state.myQueueItem?.id === nextItem.id
+        ? { ...state.myQueueItem, status: 'called' as QueueStatus, calledTime: new Date().toISOString() }
+        : state.myQueueItem,
+      queueStats: {
+        ...state.queueStats,
+        totalWaiting: Math.max(0, state.queueStats.totalWaiting - 1),
+        vipWaiting: Math.max(0, state.queueStats.vipWaiting - (nextItem.isVip ? 1 : 0)),
+        normalWaiting: Math.max(0, state.queueStats.normalWaiting - (nextItem.isVip ? 0 : 1)),
+      },
+    }))
     return nextItem
+  },
+
+  expireQueue: (queueId) => {
+    set((state) => {
+      const item = state.queueItems.find(q => q.id === queueId)
+      return {
+        queueItems: state.queueItems.map(q =>
+          q.id === queueId
+            ? { ...q, status: 'expired' as QueueStatus }
+            : q
+        ),
+        myQueueItem: state.myQueueItem?.id === queueId
+          ? { ...state.myQueueItem, status: 'expired' as QueueStatus }
+          : state.myQueueItem,
+        queueStats: item?.isVip
+          ? {
+              ...state.queueStats,
+              vipWaiting: Math.max(0, state.queueStats.vipWaiting - 1),
+            }
+          : {
+              ...state.queueStats,
+              normalWaiting: Math.max(0, state.queueStats.normalWaiting - 1),
+            },
+      }
+    })
   },
 
   getPriorityQueue: () =>
@@ -116,6 +165,15 @@ export const useQueueStore = create<QueueState>((set, get) => ({
     get().queueItems
       .filter(q => q.status === 'waiting' && q.priority === 'normal')
       .sort((a, b) => new Date(a.joinTime).getTime() - new Date(b.joinTime).getTime()),
+
+  getCalledQueue: () =>
+    get().queueItems
+      .filter(q => q.status === 'called' || q.status === 'expired')
+      .sort((a, b) => {
+        const timeA = a.calledTime ? new Date(a.calledTime).getTime() : 0
+        const timeB = b.calledTime ? new Date(b.calledTime).getTime() : 0
+        return timeB - timeA
+      }),
 
   getWaitingCount: () =>
     get().queueItems.filter(q => q.status === 'waiting').length,
@@ -134,13 +192,23 @@ export const useQueueStore = create<QueueState>((set, get) => ({
 
   fetchQueue: async () => {
     set({ loading: true })
-    await new Promise((resolve) => setTimeout(resolve, 500))
-    set({ queueItems: mockQueueItems, queueStats: mockQueueStats, loading: false })
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    const state = get()
+    if (!state.queueInitialized) {
+      set({ queueItems: mockQueueItems, queueStats: mockQueueStats, queueInitialized: true, loading: false })
+    } else {
+      set({ loading: false })
+    }
   },
 
   fetchMyQueue: async () => {
     set({ loading: true })
-    await new Promise((resolve) => setTimeout(resolve, 300))
-    set({ myQueueItem: mockMyQueueItem, loading: false })
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    const state = get()
+    if (!state.myQueueInitialized) {
+      set({ myQueueItem: mockMyQueueItem, myQueueInitialized: true, loading: false })
+    } else {
+      set({ loading: false })
+    }
   },
 }))

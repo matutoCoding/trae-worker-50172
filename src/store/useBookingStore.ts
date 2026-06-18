@@ -7,6 +7,8 @@ interface BookingState {
   bookings: Booking[]
   cycleRules: CycleRule[]
   loading: boolean
+  bookingsInitialized: boolean
+  rulesInitialized: boolean
 
   setBookings: (bookings: Booking[]) => void
   setCycleRules: (rules: CycleRule[]) => void
@@ -14,19 +16,24 @@ interface BookingState {
   updateBooking: (bookingId: string, updates: Partial<Booking>) => void
   cancelBooking: (bookingId: string) => void
   addCycleRule: (rule: CycleRule) => void
+  updateCycleRule: (ruleId: string, updates: Partial<CycleRule>) => void
   toggleCycleRule: (ruleId: string) => void
   getBookingsByDate: (date: string) => Booking[]
   getUpcomingBookings: () => Booking[]
   getCycleBookings: (ruleId: string) => Booking[]
+  getBookingById: (bookingId: string) => Booking | undefined
+  getCycleRuleById: (ruleId: string) => CycleRule | undefined
   generateCycleBookings: (ruleId: string) => Booking[]
   fetchBookings: () => Promise<void>
   fetchCycleRules: () => Promise<void>
 }
 
 export const useBookingStore = create<BookingState>((set, get) => ({
-  bookings: mockBookings,
-  cycleRules: mockCycleRules,
+  bookings: [],
+  cycleRules: [],
   loading: false,
+  bookingsInitialized: false,
+  rulesInitialized: false,
 
   setBookings: (bookings) => set({ bookings }),
 
@@ -50,7 +57,14 @@ export const useBookingStore = create<BookingState>((set, get) => ({
     })),
 
   addCycleRule: (rule) =>
-    set((state) => ({ cycleRules: [rule, ...state.cycleRules] })),
+    set((state) => ({ cycleRules: [rule, ...state.cycleRules], rulesInitialized: true })),
+
+  updateCycleRule: (ruleId, updates) =>
+    set((state) => ({
+      cycleRules: state.cycleRules.map((r) =>
+        r.id === ruleId ? { ...r, ...updates } : r
+      ),
+    })),
 
   toggleCycleRule: (ruleId) =>
     set((state) => ({
@@ -69,6 +83,12 @@ export const useBookingStore = create<BookingState>((set, get) => ({
 
   getCycleBookings: (ruleId) =>
     get().bookings.filter((b) => b.cycleRuleId === ruleId),
+
+  getBookingById: (bookingId) =>
+    get().bookings.find((b) => b.id === bookingId),
+
+  getCycleRuleById: (ruleId) =>
+    get().cycleRules.find((r) => r.id === ruleId),
 
   generateCycleBookings: (ruleId) => {
     const rule = get().cycleRules.find((r) => r.id === ruleId)
@@ -105,13 +125,23 @@ export const useBookingStore = create<BookingState>((set, get) => ({
 
   fetchBookings: async () => {
     set({ loading: true })
-    await new Promise((resolve) => setTimeout(resolve, 500))
-    set({ bookings: mockBookings, loading: false })
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    const state = get()
+    if (!state.bookingsInitialized) {
+      set({ bookings: mockBookings, bookingsInitialized: true, loading: false })
+    } else {
+      set({ loading: false })
+    }
   },
 
   fetchCycleRules: async () => {
     set({ loading: true })
-    await new Promise((resolve) => setTimeout(resolve, 500))
-    set({ cycleRules: mockCycleRules, loading: false })
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    const state = get()
+    if (!state.rulesInitialized) {
+      set({ cycleRules: mockCycleRules, rulesInitialized: true, loading: false })
+    } else {
+      set({ loading: false })
+    }
   },
 }))

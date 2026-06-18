@@ -35,7 +35,7 @@ const timeSlots = [
 const CycleRulePage: React.FC = () => {
   const router = useRouter()
   const { seats, getSeatById } = useSeatStore()
-  const { addCycleRule, cycleRules, generateCycleBookings, addBooking, bookings } = useBookingStore()
+  const { addCycleRule, updateCycleRule, cycleRules, generateCycleBookings, addBooking, bookings, getCycleRuleById } = useBookingStore()
 
   const [selectedSeat, setSelectedSeat] = useState<Seat | null>(null)
   const [frequency, setFrequency] = useState<CycleFrequency>('weekly')
@@ -54,7 +54,7 @@ const CycleRulePage: React.FC = () => {
     if (id) {
       setIsEditing(true)
       setEditingId(id)
-      const rule = cycleRules.find(r => r.id === id)
+      const rule = getCycleRuleById(id)
       if (rule) {
         const seat = getSeatById(rule.seatId)
         if (seat) setSelectedSeat(seat)
@@ -66,7 +66,7 @@ const CycleRulePage: React.FC = () => {
         setEndDate(rule.endDate)
       }
     }
-  }, [router.params, cycleRules, getSeatById])
+  }, [router.params, getCycleRuleById, getSeatById])
 
   const estimatedCount = useMemo(() => {
     if (!selectedSeat) return 0
@@ -203,7 +203,68 @@ const CycleRulePage: React.FC = () => {
     const weekdays = frequency === 'daily' ? [0, 1, 2, 3, 4, 5, 6] : selectedWeekdays
 
     if (isEditing) {
-      Taro.showToast({ title: '修改成功', icon: 'success' })
+      const originalRule = getCycleRuleById(editingId)
+      const seatChanged = originalRule && selectedSeat && originalRule.seatId !== selectedSeat.id
+      const scheduleChanged = originalRule && (
+        originalRule.frequency !== frequency ||
+        JSON.stringify(originalRule.weekdays.sort()) !== JSON.stringify([...weekdays].sort()) ||
+        originalRule.startTime !== startTime ||
+        originalRule.endTime !== endTime ||
+        originalRule.startDate !== startDate ||
+        originalRule.endDate !== endDate
+      )
+
+      updateCycleRule(editingId, {
+        seatId: selectedSeat.id,
+        seatNumber: selectedSeat.seatNumber,
+        frequency,
+        weekdays,
+        startTime,
+        endTime,
+        startDate,
+        endDate,
+      })
+
+      if (seatChanged || scheduleChanged) {
+        Taro.showModal({
+          title: '修改成功',
+          content: `规则已更新，是否重新生成 ${estimatedCount} 条预约？\n（原预约如未使用建议取消）`,
+          confirmText: '重新生成',
+          cancelText: '暂不生成',
+          success: (res) => {
+            if (res.confirm) {
+              const generated = generateCycleBookings(editingId)
+              generated.forEach(booking => {
+                const exists = bookings.some(
+                  b => b.date === booking.date && b.seatId === booking.seatId && b.cycleRuleId === editingId
+                )
+                if (!exists) {
+                  addBooking(booking)
+                }
+              })
+              Taro.showToast({
+                title: `已生成 ${generated.length} 条预约`,
+                icon: 'success',
+              })
+            } else {
+              Taro.showToast({ title: '已保存修改', icon: 'success' })
+            }
+            setTimeout(() => {
+              Taro.navigateBack()
+            }, 1500)
+          },
+        })
+      } else {
+        Taro.showToast({
+          title: '已保存修改',
+          icon: 'success',
+          success: () => {
+            setTimeout(() => {
+              Taro.navigateBack()
+            }, 1500)
+          }
+        })
+      }
     } else {
       const newRule: CycleRule = {
         id: `cycle-${Date.now()}`,

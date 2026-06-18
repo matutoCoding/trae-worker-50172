@@ -20,7 +20,7 @@ const timeSlots = [
 const BookingEditPage: React.FC = () => {
   const router = useRouter()
   const { seats, getSeatById } = useSeatStore()
-  const { addBooking } = useBookingStore()
+  const { addBooking, updateBooking, getBookingById } = useBookingStore()
 
   const [selectedSeat, setSelectedSeat] = useState<Seat | null>(null)
   const [selectedDate, setSelectedDate] = useState(getTodayDate())
@@ -32,22 +32,35 @@ const BookingEditPage: React.FC = () => {
     const { seatId, time, id } = router.params
     console.log('[BookingEditPage] 参数:', { seatId, time, id })
 
-    if (seatId) {
-      const seat = getSeatById(seatId)
-      if (seat) setSelectedSeat(seat)
-    } else if (seats.length > 0) {
-      const availableSeat = seats.find(s => s.status === 'available')
-      if (availableSeat) setSelectedSeat(availableSeat)
-    }
-
-    if (time) {
-      setSelectedStartTime(time)
-    }
-
     if (id) {
       setIsEditing(true)
+      const originalBooking = getBookingById(id)
+      if (originalBooking) {
+        const seat = getSeatById(originalBooking.seatId)
+        if (seat) setSelectedSeat(seat)
+        setSelectedDate(originalBooking.date)
+        setSelectedStartTime(originalBooking.startTime)
+        const startHour = parseInt(originalBooking.startTime.split(':')[0])
+        const endHour = parseInt(originalBooking.endTime.split(':')[0])
+        const durationHours = endHour - startHour
+        if (durationHours > 0) {
+          setDuration(durationHours)
+        }
+      }
+    } else {
+      if (seatId) {
+        const seat = getSeatById(seatId)
+        if (seat) setSelectedSeat(seat)
+      } else if (seats.length > 0) {
+        const availableSeat = seats.find(s => s.status === 'available')
+        if (availableSeat) setSelectedSeat(availableSeat)
+      }
+
+      if (time) {
+        setSelectedStartTime(time)
+      }
     }
-  }, [router.params, seats, getSeatById])
+  }, [router.params, seats, getSeatById, getBookingById])
 
   const dateList = useMemo(() => {
     const list = []
@@ -115,31 +128,54 @@ const BookingEditPage: React.FC = () => {
       price,
     })
 
-    const newBooking = {
-      id: `booking-${Date.now()}`,
-      userId: 'user-1',
-      seatId: selectedSeat.id,
-      seatNumber: selectedSeat.seatNumber,
-      date: selectedDate,
-      startTime: selectedStartTime,
-      endTime,
-      status: 'upcoming' as const,
-      isCycleBooking: false,
-      createTime: new Date().toISOString(),
-      updateTime: new Date().toISOString(),
+    if (isEditing) {
+      const { id } = router.params
+      if (id) {
+        updateBooking(id, {
+          seatId: selectedSeat.id,
+          seatNumber: selectedSeat.seatNumber,
+          date: selectedDate,
+          startTime: selectedStartTime,
+          endTime,
+        })
+
+        Taro.showToast({
+          title: '修改成功',
+          icon: 'success',
+          success: () => {
+            setTimeout(() => {
+              Taro.navigateBack()
+            }, 1500)
+          },
+        })
+      }
+    } else {
+      const newBooking = {
+        id: `booking-${Date.now()}`,
+        userId: 'user-1',
+        seatId: selectedSeat.id,
+        seatNumber: selectedSeat.seatNumber,
+        date: selectedDate,
+        startTime: selectedStartTime,
+        endTime,
+        status: 'upcoming' as const,
+        isCycleBooking: false,
+        createTime: new Date().toISOString(),
+        updateTime: new Date().toISOString(),
+      }
+
+      addBooking(newBooking)
+
+      Taro.showToast({
+        title: '预约成功',
+        icon: 'success',
+        success: () => {
+          setTimeout(() => {
+            Taro.navigateBack()
+          }, 1500)
+        },
+      })
     }
-
-    addBooking(newBooking)
-
-    Taro.showToast({
-      title: '预约成功',
-      icon: 'success',
-      success: () => {
-        setTimeout(() => {
-          Taro.navigateBack()
-        }, 1500)
-      },
-    })
   }
 
   const canSubmit = selectedSeat && selectedStartTime
