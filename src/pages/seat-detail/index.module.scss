@@ -1,0 +1,217 @@
+@use '@/styles/variables.scss' as *;
+
+.page {
+  min-height: 100vh;
+  background-color: $color-bg-page;
+  padding-bottom: 140rpx;
+}
+
+.seatHeader {
+  background: linear-gradient(135deg, $color-primary 0%, $color-primary-dark 100%);
+  padding: $spacing-xl $page-padding 120rpx;
+  position: relative;
+}
+
+.seatNumber {
+  font-size: 64rpx;
+  font-weight: $font-weight-bold;
+  color: $color-text-white;
+  margin-bottom: $spacing-xs;
+}
+
+.seatType {
+  display: inline-flex;
+  padding: 6rpx 16rpx;
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: $radius-round;
+  color: #fff;
+  font-size: $font-size-sm;
+}
+
+.statusCard {
+  background-color: $color-bg-card;
+  margin: -60rpx $page-padding $spacing-lg;
+  padding: $spacing-lg;
+  border-radius: $radius-lg;
+  box-shadow: $shadow-card;
+  position: relative;
+  z-index: 1;
+}
+
+.statusRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: $spacing-md;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.statusLabel {
+  font-size: $font-size-md;
+  color: $color-text-tertiary;
+}
+
+.statusValue {
+  font-size: $font-size-md;
+  color: $color-text-primary;
+  font-weight: $font-weight-medium;
+}
+
+.statusValueSuccess {
+  color: $color-success;
+}
+
+.statusValueWarning {
+  color: $color-warning;
+}
+
+.infoSection {
+  margin: 0 $page-padding $spacing-lg;
+  background-color: $color-bg-card;
+  border-radius: $radius-lg;
+  box-shadow: $shadow-card;
+  overflow: hidden;
+}
+
+.sectionTitle {
+  padding: $spacing-md $spacing-lg;
+  font-size: $font-size-lg;
+  font-weight: $font-weight-semibold;
+  color: $color-text-primary;
+  border-bottom: 1rpx solid $color-divider;
+}
+
+.infoRow {
+  display: flex;
+  align-items: center;
+  padding: $spacing-md $spacing-lg;
+  border-bottom: 1rpx solid $color-divider;
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.infoIcon {
+  font-size: 32rpx;
+  margin-right: $spacing-md;
+}
+
+.infoText {
+  flex: 1;
+  font-size: $font-size-md;
+  color: $color-text-primary;
+}
+
+.infoCheck {
+  font-size: $font-size-md;
+  color: $color-success;
+}
+
+.infoNo {
+  font-size: $font-size-md;
+  color: $color-text-tertiary;
+}
+
+.timeSection {
+  margin: 0 $page-padding $spacing-lg;
+}
+
+.timeSlots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-sm;
+  background-color: $color-bg-card;
+  padding: $spacing-lg;
+  border-radius: $radius-lg;
+  box-shadow: $shadow-card;
+}
+
+.timeSlot {
+  @include button-reset;
+  width: calc((100% - 24rpx * 3) / 4);
+  height: 72rpx;
+  border-radius: $radius-md;
+  background-color: $color-bg-hover;
+  color: $color-text-secondary;
+  font-size: $font-size-sm;
+  transition: all $transition-base;
+
+  &.available {
+    background-color: $color-primary-light;
+    color: $color-primary;
+    border: 2rpx solid $color-primary;
+  }
+
+  &.occupied {
+    background-color: $color-bg-hover;
+    color: $color-text-tertiary;
+  }
+
+  &.selected {
+    background: linear-gradient(135deg, $color-primary 0%, $color-primary-dark 100%);
+    color: $color-text-white;
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+}
+
+.bottomBar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: $color-bg-card;
+  padding: $spacing-md $page-padding;
+  padding-bottom: calc(env(safe-area-inset-bottom) + $spacing-md);
+  box-shadow: 0 -2rpx 12rpx rgba(0, 0, 0, 0.06);
+  display: flex;
+  gap: $spacing-md;
+  z-index: 100;
+}
+
+.secondaryBtn {
+  @include button-reset;
+  flex: 1;
+  height: $button-height-lg;
+  border-radius: $radius-button;
+  background-color: $color-bg-hover;
+  color: $color-text-secondary;
+  font-size: $font-size-md;
+  font-weight: $font-weight-medium;
+  transition: all $transition-base;
+
+  &:active {
+    opacity: 0.8;
+  }
+}
+
+.primaryBtn {
+  @include button-reset;
+  flex: 2;
+  height: $button-height-lg;
+  border-radius: $radius-button;
+  background: linear-gradient(135deg, $color-primary 0%, $color-primary-dark 100%);
+  color: $color-text-white;
+  font-size: $font-size-lg;
+  font-weight: $font-weight-semibold;
+  transition: all $transition-base;
+
+  &:active {
+    opacity: 0.9;
+    transform: scale(0.98);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+  }
+}
+
+.vipBtn {
+  background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+}

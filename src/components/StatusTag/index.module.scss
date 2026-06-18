@@ -1,0 +1,71 @@
+@use '@/styles/variables.scss' as *;
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: $radius-sm;
+  white-space: nowrap;
+}
+
+.tagText {
+  font-size: $font-size-xs;
+  font-weight: $font-weight-medium;
+}
+
+.small {
+  padding: 4rpx 12rpx;
+  border-radius: $radius-sm;
+
+  .tagText {
+    font-size: 22rpx;
+  }
+}
+
+.medium {
+  padding: 8rpx 16rpx;
+  border-radius: $radius-sm;
+
+  .tagText {
+    font-size: $font-size-sm;
+  }
+}
+
+.large {
+  padding: 12rpx 20rpx;
+  border-radius: $radius-md;
+
+  .tagText {
+    font-size: $font-size-md;
+  }
+}
+
+.default {
+  background-color: $color-bg-tag;
+  color: $color-text-secondary;
+}
+
+.success {
+  background-color: rgba(0, 180, 42, 0.1);
+  color: $color-success;
+}
+
+.warning {
+  background-color: rgba(255, 125, 0, 0.1);
+  color: $color-warning;
+}
+
+.error {
+  background-color: rgba(245, 63, 63, 0.1);
+  color: $color-error;
+}
+
+.info {
+  background-color: rgba(43, 164, 113, 0.1);
+  color: $color-primary;
+}
+
+.vip {
+  background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+  color: #fff;
+}

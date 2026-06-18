@@ -1,0 +1,74 @@
+@use '@/styles/variables.scss' as *;
+
+.seatCard {
+  background-color: $color-bg-card;
+  border-radius: $radius-lg;
+  padding: $spacing-lg;
+  box-shadow: $shadow-card;
+  margin-bottom: $spacing-md;
+  transition: all $transition-base;
+
+  &:active {
+    transform: scale(0.98);
+    opacity: 0.9;
+  }
+
+  &.vipSeat {
+    border: 2rpx solid $color-vip;
+    background: linear-gradient(135deg, #FFFEF5 0%, #FFFFFF 100%);
+  }
+
+  &.maintenance {
+    opacity: 0.6;
+  }
+}
+
+.seatHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: $spacing-md;
+}
+
+.seatNumber {
+  font-size: $font-size-xl;
+  font-weight: $font-weight-bold;
+  color: $color-text-primary;
+}
+
+.seatBody {
+  margin-bottom: $spacing-md;
+}
+
+.seatType {
+  margin-bottom: $spacing-sm;
+}
+
+.typeText {
+  font-size: $font-size-md;
+  color: $color-text-secondary;
+}
+
+.seatFeatures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-sm;
+}
+
+.feature {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+  background-color: $color-bg-hover;
+  padding: 4rpx 12rpx;
+  border-radius: $radius-xs;
+}
+
+.seatFooter {
+  padding-top: $spacing-md;
+  border-top: 1rpx solid $color-divider;
+}
+
+.areaText {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+}

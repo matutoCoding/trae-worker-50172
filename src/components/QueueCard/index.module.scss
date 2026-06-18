@@ -1,0 +1,122 @@
+@use '@/styles/variables.scss' as *;
+
+.queueCard {
+  background-color: $color-bg-card;
+  border-radius: $radius-lg;
+  padding: $spacing-lg;
+  box-shadow: $shadow-card;
+  margin-bottom: $spacing-md;
+
+  &.vipCard {
+    border: 2rpx solid $color-vip;
+    background: linear-gradient(135deg, #FFFEF5 0%, #FFFFFF 100%);
+  }
+}
+
+.queueHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: $spacing-md;
+}
+
+.userInfo {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+}
+
+.rank {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: $radius-md;
+  background-color: $color-bg-hover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &.topRank {
+    background: linear-gradient(135deg, $color-primary 0%, $color-primary-dark 100%);
+
+    .rankText {
+      color: $color-text-white;
+    }
+  }
+}
+
+.rankText {
+  font-size: $font-size-lg;
+  font-weight: $font-weight-bold;
+  color: $color-text-secondary;
+}
+
+.userDetail {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+}
+
+.userName {
+  font-size: $font-size-lg;
+  font-weight: $font-weight-semibold;
+  color: $color-text-primary;
+}
+
+.tags {
+  display: flex;
+  gap: $spacing-xs;
+}
+
+.queueBody {
+  padding: $spacing-md 0;
+  border-top: 1rpx solid $color-divider;
+  border-bottom: 1rpx solid $color-divider;
+}
+
+.infoRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: $spacing-sm;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.infoLabel {
+  font-size: $font-size-md;
+  color: $color-text-tertiary;
+}
+
+.infoValue {
+  font-size: $font-size-md;
+  color: $color-text-primary;
+  font-weight: $font-weight-medium;
+
+  &.highlight {
+    color: $color-primary;
+    font-size: $font-size-lg;
+  }
+}
+
+.queueFooter {
+  padding-top: $spacing-md;
+}
+
+.leaveBtn {
+  @include button-reset;
+  width: 100%;
+  height: $button-height-sm;
+  border-radius: $radius-button;
+  background-color: $color-bg-hover;
+  color: $color-text-secondary;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  transition: all $transition-base;
+
+  &:active {
+    opacity: 0.8;
+    transform: scale(0.98);
+  }
+}
