@@ -31,6 +31,7 @@ export const getStatusText = (status: string): string => {
   switch (status) {
     case 'waiting': return '排队中'
     case 'called': return '已叫号'
+    case 'seated': return '已入座'
     case 'expired': return '已过期'
     case 'cancelled': return '已取消'
     case 'available': return '空闲'
@@ -48,6 +49,7 @@ export const getStatusColor = (status: string): string => {
   switch (status) {
     case 'waiting': return '#FF7D00'
     case 'called': return '#00B42A'
+    case 'seated': return '#165DFF'
     case 'expired': return '#86909C'
     case 'cancelled': return '#86909C'
     case 'available': return '#00B42A'

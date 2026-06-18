@@ -1,4 +1,4 @@
-export type QueueStatus = 'waiting' | 'called' | 'expired' | 'cancelled'
+export type QueueStatus = 'waiting' | 'called' | 'seated' | 'expired' | 'cancelled'
 
 export type PriorityLevel = 'normal' | 'vip' | 'emergency'
 
@@ -12,6 +12,8 @@ export interface QueueItem {
   queueNumber: number
   joinTime: string
   calledTime?: string
+  seatedTime?: string
+  leaveTime?: string
   expectedWaitTime: number
   isVip: boolean
   occupiedSeatId?: string

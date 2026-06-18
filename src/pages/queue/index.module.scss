@@ -573,3 +573,33 @@
     background-color: #FEE;
   }
 }
+
+.actionRow {
+  display: flex;
+  gap: $spacing-xs;
+  align-items: center;
+  margin-top: $spacing-xs;
+}
+
+.seatedBtn {
+  @include button-reset;
+  padding: $spacing-xs $spacing-sm;
+  height: auto;
+  border-radius: $radius-sm;
+  background: linear-gradient(135deg, $color-primary 0%, $color-primary-dark 100%);
+  color: $color-text-white;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-medium;
+  transition: all $transition-base;
+
+  &:active {
+    transform: scale(0.95);
+    opacity: 0.9;
+  }
+}
+
+.seatedTime {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+  margin-top: $spacing-xs;
+}

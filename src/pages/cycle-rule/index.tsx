@@ -203,17 +203,6 @@ const CycleRulePage: React.FC = () => {
     const weekdays = frequency === 'daily' ? [0, 1, 2, 3, 4, 5, 6] : selectedWeekdays
 
     if (isEditing) {
-      const originalRule = getCycleRuleById(editingId)
-      const seatChanged = originalRule && selectedSeat && originalRule.seatId !== selectedSeat.id
-      const scheduleChanged = originalRule && (
-        originalRule.frequency !== frequency ||
-        JSON.stringify(originalRule.weekdays.sort()) !== JSON.stringify([...weekdays].sort()) ||
-        originalRule.startTime !== startTime ||
-        originalRule.endTime !== endTime ||
-        originalRule.startDate !== startDate ||
-        originalRule.endDate !== endDate
-      )
-
       updateCycleRule(editingId, {
         seatId: selectedSeat.id,
         seatNumber: selectedSeat.seatNumber,
@@ -225,26 +214,17 @@ const CycleRulePage: React.FC = () => {
         endDate,
       })
 
-      if (seatChanged || scheduleChanged) {
-        Taro.showModal({
-          title: '修改成功',
-          content: `规则已更新，是否重新生成 ${estimatedCount} 条预约？\n（将覆盖该规则下所有原预约）`,
-          confirmText: '重新生成',
-          cancelText: '暂不生成',
-          success: (res) => {
-            if (res.confirm) {
-              const generated = regenerateCycleBookings(editingId)
-              Taro.showToast({
-                title: `已重新生成 ${generated.length} 条预约`,
-                icon: 'success',
-              })
-            } else {
-              Taro.showToast({ title: '已保存修改', icon: 'success' })
-            }
+      const existingBookings = getCycleBookings(editingId)
+      if (existingBookings.length > 0) {
+        const generated = regenerateCycleBookings(editingId)
+        Taro.showToast({
+          title: `已更新${generated.length}条预约`,
+          icon: 'success',
+          success: () => {
             setTimeout(() => {
               Taro.navigateBack()
             }, 1500)
-          },
+          }
         })
       } else {
         Taro.showToast({

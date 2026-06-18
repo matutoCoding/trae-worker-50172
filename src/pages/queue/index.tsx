@@ -29,6 +29,7 @@ const QueuePage: React.FC = () => {
     leaveQueue,
     callNext,
     expireQueue,
+    confirmSeated,
     getPriorityQueue,
     getNormalQueue,
     getCalledQueue,
@@ -139,8 +140,8 @@ const QueuePage: React.FC = () => {
     setSelectedPriority(priority)
   }
 
-  const handleCallNext = () => {
-    const next = callNext()
+  const handleCallNext = async () => {
+    const next = await callNext()
     if (next) {
       const priorityText = next.priority === 'emergency' ? '【应急】' : next.priority === 'vip' ? '【VIP】' : ''
       const seatText = next.occupiedSeatNumber
@@ -167,6 +168,22 @@ const QueuePage: React.FC = () => {
           expireQueue(item.id)
           Taro.showToast({ title: '已释放', icon: 'success' })
           forceUpdate(n => n + 1)
+        }
+      },
+    })
+  }
+
+  const handleConfirmSeated = (item: QueueItem) => {
+    Taro.showModal({
+      title: '确认入座',
+      content: `确认 ${item.queueNumber} 号 ${item.userName}\n已就座于 ${item.occupiedSeatNumber || '指定座位'} ？`,
+      success: (res) => {
+        if (res.confirm) {
+          const result = confirmSeated(item.id)
+          if (result) {
+            Taro.showToast({ title: '已确认入座', icon: 'success' })
+            forceUpdate(n => n + 1)
+          }
         }
       },
     })
@@ -247,35 +264,52 @@ const QueuePage: React.FC = () => {
             <View className={styles.infoItem}>
               <Text className={styles.infoLabel}>座位类型</Text>
               <Text className={styles.infoValue}>
-                {myQueueItem.seatType ? getSeatTypeText(myQueueItem.seatType) : '随机分配'}
+                {myQueueItem.occupiedSeatNumber
+                  ? `${myQueueItem.occupiedSeatNumber}号座位`
+                  : myQueueItem.seatType ? getSeatTypeText(myQueueItem.seatType) : '随机分配'}
               </Text>
             </View>
             <View className={styles.infoItem}>
               <Text className={styles.infoLabel}>预计等待</Text>
               <Text className={classnames(styles.infoValue, styles.highlight)}>
-                {myQueueItem.expectedWaitTime}分钟
+                {myQueueItem.status === 'waiting' ? `${myQueueItem.expectedWaitTime}分钟` : '已安排'}
               </Text>
             </View>
             <View className={styles.infoItem}>
               <Text className={styles.infoLabel}>排队状态</Text>
               <Text className={styles.infoValue}>
-                {myQueueItem.status === 'waiting' ? '排队中' : '已叫号'}
+                {myQueueItem.status === 'waiting' ? '排队中' :
+                 myQueueItem.status === 'called' ? '已叫号，请尽快入座' :
+                 myQueueItem.status === 'seated' ? '已入座，学习中' :
+                 myQueueItem.status === 'expired' ? '已过期' : '已取消'}
               </Text>
             </View>
           </View>
 
           <View className={styles.myQueueActions}>
-            <Button
-              className={classnames(styles.actionBtn, styles.btnSecondary)}
-              onClick={() => handleLeaveQueue(myQueueItem)}
-            >
-              取消排队
-            </Button>
+            {(myQueueItem.status === 'waiting' || myQueueItem.status === 'called') && (
+              <Button
+                className={classnames(styles.actionBtn, styles.btnSecondary)}
+                onClick={() => handleLeaveQueue(myQueueItem)}
+              >
+                取消排队
+              </Button>
+            )}
             <Button
               className={classnames(styles.actionBtn, isMyQueueVip ? styles.btnVip : styles.btnPrimary)}
-              onClick={() => Taro.showToast({ title: '叫号后会通知您', icon: 'none' })}
+              onClick={() => {
+                if (myQueueItem.status === 'called') {
+                  handleConfirmSeated(myQueueItem)
+                } else if (myQueueItem.status === 'seated') {
+                  Taro.showToast({ title: '学习中，加油！', icon: 'none' })
+                } else {
+                  Taro.showToast({ title: '叫号后会通知您', icon: 'none' })
+                }
+              }}
             >
-              {myQueueItem.status === 'called' ? '立即入座' : '等待叫号'}
+              {myQueueItem.status === 'waiting' ? '等待叫号' :
+               myQueueItem.status === 'called' ? '立即入座' :
+               myQueueItem.status === 'seated' ? '学习中' : '已结束'}
             </Button>
           </View>
         </View>
@@ -377,17 +411,32 @@ const QueuePage: React.FC = () => {
                     </Text>
                   </View>
                   <View className={styles.calledRight}>
-                    {item.status === 'called' ? (
+                    {item.status === 'seated' ? (
+                      <View className={styles.calledStatusCol}>
+                        <StatusTag text="已入座" type="info" size="small" />
+                        <Text className={styles.seatedTime}>
+                          {item.seatedTime ? new Date(item.seatedTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : ''}
+                        </Text>
+                      </View>
+                    ) : item.status === 'called' ? (
                       <View className={styles.calledStatusCol}>
                         <StatusTag text="待入座" type="warning" size="small" />
-                        {showStaffMode && (
+                        <View className={styles.actionRow}>
                           <Button
-                            className={styles.expireBtn}
-                            onClick={() => handleExpireManually(item)}
+                            className={styles.seatedBtn}
+                            onClick={() => handleConfirmSeated(item)}
                           >
-                            超时释放
+                            确认入座
                           </Button>
-                        )}
+                          {showStaffMode && (
+                            <Button
+                              className={styles.expireBtn}
+                              onClick={() => handleExpireManually(item)}
+                            >
+                              超时释放
+                            </Button>
+                          )}
+                        </View>
                       </View>
                     ) : (
                       <StatusTag text="已过期" type="error" size="small" />

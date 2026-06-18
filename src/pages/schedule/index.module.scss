@@ -273,3 +273,126 @@
 .addIcon {
   font-size: 48rpx;
 }
+
+.tabs {
+  position: relative;
+}
+
+.tabBadge {
+  position: absolute;
+  top: 8rpx;
+  margin-left: 4rpx;
+  min-width: 32rpx;
+  height: 32rpx;
+  padding: 0 8rpx;
+  background-color: $color-error;
+  color: $color-text-white;
+  font-size: $font-size-xs;
+  border-radius: 16rpx;
+  text-align: center;
+  line-height: 32rpx;
+}
+
+.filterBar {
+  padding: 0 $page-padding $spacing-md;
+  background-color: $color-bg-page;
+}
+
+.filterRuleBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: $spacing-md;
+  background: linear-gradient(135deg, rgba($color-primary, 0.1) 0%, rgba($color-primary, 0.05) 100%);
+  border-radius: $radius-md;
+  border: 1rpx solid rgba($color-primary, 0.2);
+}
+
+.filterRuleText {
+  font-size: $font-size-md;
+  color: $color-primary;
+  font-weight: $font-weight-medium;
+}
+
+.filterBackBtn {
+  @include button-reset;
+  padding: $spacing-xs $spacing-md;
+  height: auto;
+  background-color: $color-primary;
+  color: $color-text-white;
+  font-size: $font-size-sm;
+  border-radius: $radius-sm;
+  transition: all $transition-base;
+
+  &:active {
+    transform: scale(0.95);
+    opacity: 0.9;
+  }
+}
+
+.filterScroll {
+  white-space: nowrap;
+}
+
+.filterRow {
+  display: inline-flex;
+  gap: $spacing-sm;
+  padding: $spacing-xs 0;
+}
+
+.filterChip {
+  @include button-reset;
+  padding: $spacing-sm $spacing-md;
+  height: auto;
+  background-color: $color-bg-card;
+  color: $color-text-secondary;
+  font-size: $font-size-sm;
+  border-radius: $radius-lg;
+  border: 1rpx solid $color-divider;
+  transition: all $transition-base;
+  flex-shrink: 0;
+  display: inline-flex;
+  vertical-align: top;
+
+  &.active {
+    background: linear-gradient(135deg, $color-primary 0%, $color-primary-dark 100%);
+    color: $color-text-white;
+    border-color: transparent;
+  }
+
+  &:active {
+    transform: scale(0.97);
+  }
+}
+
+.resetBtn {
+  @include button-reset;
+  padding: $spacing-sm $spacing-md;
+  height: auto;
+  background-color: rgba($color-error, 0.08);
+  color: $color-error;
+  font-size: $font-size-sm;
+  border-radius: $radius-lg;
+  flex-shrink: 0;
+  transition: all $transition-base;
+  display: inline-flex;
+  vertical-align: top;
+
+  &:active {
+    transform: scale(0.97);
+  }
+}
+
+.cycleCount {
+  color: $color-primary;
+  font-weight: $font-weight-semibold;
+}
+
+.bookingSummary {
+  padding: $spacing-sm $spacing-md $spacing-md;
+}
+
+.summaryLabel {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+}

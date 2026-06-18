@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { QueueItem, QueueStats, PriorityLevel, QueueStatus } from '@/types/queue'
 import { queueItems as mockQueueItems, queueStats as mockQueueStats, myQueueItem as mockMyQueueItem } from '@/data/queue'
-import { saveToStorage, loadFromStorage } from '@/utils/persist'
+import { saveToStorage, loadFromStorage, hasStorageKey } from '@/utils/persist'
 import { useSeatStore } from './useSeatStore'
 
 const QUEUE_ITEMS_KEY = 'queueItems'
@@ -32,6 +32,7 @@ interface QueueState {
   fetchMyQueue: () => Promise<void>
   resetQueueData: () => void
   occupySeatForQueue: (queueId: string, seatId: string) => void
+  confirmSeated: (queueId: string) => QueueItem | null
 }
 
 const getPriorityWeight = (priority: PriorityLevel): number => {
@@ -116,7 +117,12 @@ export const useQueueStore = create<QueueState>((set, get) => ({
     get().recalcStats()
   },
 
-  callNext: () => {
+  callNext: async () => {
+    const seatStore = useSeatStore.getState()
+    if (!seatStore.seatsLoaded) {
+      await seatStore.fetchSeats()
+    }
+
     const waitingItems = get().queueItems
       .filter(q => q.status === 'waiting')
       .sort((a, b) => {
@@ -129,13 +135,13 @@ export const useQueueStore = create<QueueState>((set, get) => ({
 
     const nextItem = waitingItems[0]
 
-    const seatStore = useSeatStore.getState()
-    const availableSeat = seatStore.getAvailableSeatByType(nextItem.seatType || 'single')
+    const freshSeatStore = useSeatStore.getState()
+    const availableSeat = freshSeatStore.getAvailableSeatByType(nextItem.seatType || 'single')
 
     let occupiedSeatId: string | undefined
     let occupiedSeatNumber: string | undefined
     if (availableSeat) {
-      seatStore.occupySeat(availableSeat.id)
+      freshSeatStore.occupySeat(availableSeat.id)
       occupiedSeatId = availableSeat.id
       occupiedSeatNumber = availableSeat.seatNumber
     }
@@ -295,8 +301,9 @@ export const useQueueStore = create<QueueState>((set, get) => ({
     await new Promise((resolve) => setTimeout(resolve, 50))
     const state = get()
     if (!state.myQueueLoaded) {
-      const stored = loadFromStorage<QueueItem | null>(MY_QUEUE_KEY, null)
-      if (stored) {
+      const hasStored = hasStorageKey(MY_QUEUE_KEY)
+      if (hasStored) {
+        const stored = loadFromStorage<QueueItem | null>(MY_QUEUE_KEY, null)
         set({ myQueueItem: stored, myQueueLoaded: true, loading: false })
       } else {
         set({ myQueueItem: mockMyQueueItem, myQueueLoaded: true, loading: false })
@@ -321,5 +328,32 @@ export const useQueueStore = create<QueueState>((set, get) => ({
 
   occupySeatForQueue: (queueId, seatId) => {
     console.log('[Queue] 占位座位:', { queueId, seatId })
+  },
+
+  confirmSeated: (queueId) => {
+    const item = get().queueItems.find(q => q.id === queueId)
+    if (!item || (item.status !== 'called')) return null
+
+    const now = new Date().toISOString()
+    const newQueueItems = get().queueItems.map(q =>
+      q.id === queueId
+        ? { ...q, status: 'seated' as QueueStatus, seatedTime: now }
+        : q
+    )
+    const isMyQueue = get().myQueueItem?.id === queueId
+
+    set({
+      queueItems: newQueueItems,
+      myQueueItem: isMyQueue
+        ? { ...get().myQueueItem!, status: 'seated' as QueueStatus, seatedTime: now }
+        : get().myQueueItem,
+    })
+    saveToStorage(QUEUE_ITEMS_KEY, newQueueItems)
+    if (isMyQueue && get().myQueueItem) {
+      saveToStorage(MY_QUEUE_KEY, get().myQueueItem)
+    }
+    get().recalcStats()
+
+    return newQueueItems.find(q => q.id === queueId) || null
   },
 }))
