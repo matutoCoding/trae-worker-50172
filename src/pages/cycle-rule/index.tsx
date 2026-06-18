@@ -220,22 +220,20 @@ const CycleRulePage: React.FC = () => {
         Taro.showToast({
           title: `已更新${generated.length}条预约`,
           icon: 'success',
-          success: () => {
-            setTimeout(() => {
-              Taro.navigateBack()
-            }, 1500)
-          }
+          duration: 1200,
         })
+        setTimeout(() => {
+          Taro.navigateBack({ delta: 1 })
+        }, 1200)
       } else {
         Taro.showToast({
           title: '已保存修改',
           icon: 'success',
-          success: () => {
-            setTimeout(() => {
-              Taro.navigateBack()
-            }, 1500)
-          }
+          duration: 1200,
         })
+        setTimeout(() => {
+          Taro.navigateBack({ delta: 1 })
+        }, 1200)
       }
     } else {
       const newRule: CycleRule = {
@@ -274,11 +272,21 @@ const CycleRulePage: React.FC = () => {
             Taro.showToast({
               title: `已生成 ${generated.length} 条预约`,
               icon: 'success',
+              duration: 1200,
             })
+            setTimeout(() => {
+              Taro.navigateBack({ delta: 1 })
+            }, 1200)
+          } else {
+            Taro.showToast({
+              title: '规则已创建',
+              icon: 'success',
+              duration: 1000,
+            })
+            setTimeout(() => {
+              Taro.navigateBack({ delta: 1 })
+            }, 1000)
           }
-          setTimeout(() => {
-            Taro.navigateBack()
-          }, 1500)
         },
       })
     }

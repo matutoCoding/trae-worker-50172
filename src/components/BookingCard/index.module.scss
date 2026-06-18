@@ -86,3 +86,25 @@
   background: linear-gradient(135deg, $color-primary 0%, $color-primary-dark 100%);
   color: $color-text-white;
 }
+
+.arrivedBtn {
+  background-color: #FFF7E6;
+  color: #FF7D00;
+  border: 1rpx solid #FFDDBB;
+}
+
+.startBtn {
+  background: linear-gradient(135deg, $color-primary 0%, $color-primary-dark 100%);
+  color: $color-text-white;
+}
+
+.leaveBtn {
+  background-color: #FFF1F0;
+  color: $color-error;
+  border: 1rpx solid #FFCCC7;
+}
+
+.noshowBtn {
+  background-color: $color-bg-hover;
+  color: $color-text-tertiary;
+}

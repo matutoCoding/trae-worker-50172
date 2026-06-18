@@ -3,6 +3,7 @@ import { View, Text, Image, Button } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { useUserStore } from '@/store/useUserStore'
 import { useBookingStore } from '@/store/useBookingStore'
+import { useUsageStore } from '@/store/useUsageStore'
 import StatusTag from '@/components/StatusTag'
 import { formatDate } from '@/utils/date'
 import styles from './index.module.scss'
@@ -10,24 +11,32 @@ import styles from './index.module.scss'
 const MinePage: React.FC = () => {
   const { user, userStats, fetchUser, fetchUserStats, isVip, getUserLevelText } = useUserStore()
   const { bookings } = useBookingStore()
+  const { records: usageRecords, fetchRecords: fetchUsageRecords, getMyRecords } = useUsageStore()
 
   useEffect(() => {
     console.log('[MinePage] 页面初始化')
     fetchUser()
     fetchUserStats()
-  }, [fetchUser, fetchUserStats])
+    fetchUsageRecords()
+  }, [fetchUser, fetchUserStats, fetchUsageRecords])
 
   useDidShow(() => {
     console.log('[MinePage] 页面显示，刷新数据')
     fetchUser()
     fetchUserStats()
+    fetchUsageRecords()
   })
+
+  const myRecords = getMyRecords()
 
   const handleMenuClick = (menu: string) => {
     console.log('[MinePage] 点击菜单:', menu)
     switch (menu) {
       case 'bookings':
         Taro.switchTab({ url: '/pages/schedule/index' })
+        break
+      case 'records':
+        Taro.switchTab({ url: '/pages/queue/index' })
         break
       case 'vip':
         Taro.showToast({ title: 'VIP开通功能开发中', icon: 'none' })
@@ -119,6 +128,38 @@ const MinePage: React.FC = () => {
               <Text className={styles.vipCardDesc}>有效期至 {formatDate(user.vipExpireDate)}</Text>
             </View>
             <Button className={styles.vipCardBtn}>续费</Button>
+          </View>
+        </View>
+      )}
+
+      <Text className={styles.sectionTitle}>最近学习记录</Text>
+
+      {myRecords.length > 0 ? (
+        <View className={styles.menuSection}>
+          {myRecords.slice(0, 3).map(record => (
+            <View key={record.id} className={styles.menuItem} onClick={() => handleMenuClick('records')}>
+              <Text className={styles.menuIcon}>📝</Text>
+              <View className={styles.recordInfo}>
+                <Text className={styles.recordSeat}>{record.seatNumber}</Text>
+                <Text className={styles.recordMeta}>
+                  {record.source === 'queue' ? `排队${record.queueNumber}号` : '预约到店'} · {new Date(record.startTime).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                </Text>
+              </View>
+              <StatusTag
+                text={record.status === 'using' ? '使用中' : record.status === 'completed' ? '已完成' : record.status === 'timeout' ? '超时' : record.status === 'cancelled' ? '已取消' : '爽约'}
+                type={record.status === 'using' ? 'success' : record.status === 'completed' ? 'default' : 'warning'}
+                size="small"
+              />
+              <Text className={styles.menuArrow}>›</Text>
+            </View>
+          ))}
+        </View>
+      ) : (
+        <View className={styles.menuSection}>
+          <View className={styles.menuItem} onClick={() => handleMenuClick('records')}>
+            <Text className={styles.menuIcon}>📝</Text>
+            <Text className={styles.menuTitle}>暂无学习记录，去自习室体验</Text>
+            <Text className={styles.menuArrow}>›</Text>
           </View>
         </View>
       )}

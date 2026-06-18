@@ -25,6 +25,10 @@ const SchedulePage: React.FC = () => {
     cancelBooking,
     regenerateCycleBookings,
     getCycleBookings,
+    markArrived,
+    startUsing,
+    leaveEarly,
+    markNoShow,
   } = useBookingStore()
 
   const { seats, fetchSeats } = useSeatStore()
@@ -148,6 +152,58 @@ const SchedulePage: React.FC = () => {
   const handleEditBooking = (booking: Booking) => {
     Taro.navigateTo({
       url: `/pages/booking-edit/index?id=${booking.id}`,
+    })
+  }
+
+  const handleArrived = (booking: Booking) => {
+    Taro.showModal({
+      title: '确认到店',
+      content: `确认 ${booking.seatNumber} ${booking.startTime} 的预约已到店？`,
+      success: (res) => {
+        if (res.confirm) {
+          markArrived(booking.id)
+          Taro.showToast({ title: '已标记到店', icon: 'success' })
+        }
+      },
+    })
+  }
+
+  const handleStartUsing = (booking: Booking) => {
+    Taro.showModal({
+      title: '开始使用',
+      content: `确认开始使用 ${booking.seatNumber} 座位？\n座位将标记为使用中。`,
+      success: (res) => {
+        if (res.confirm) {
+          startUsing(booking.id)
+          Taro.showToast({ title: '已开始使用', icon: 'success' })
+        }
+      },
+    })
+  }
+
+  const handleLeaveEarly = (booking: Booking) => {
+    Taro.showModal({
+      title: '提前离座',
+      content: `确认提前结束使用 ${booking.seatNumber}？\n座位将释放为可用。`,
+      success: (res) => {
+        if (res.confirm) {
+          leaveEarly(booking.id, '提前离座')
+          Taro.showToast({ title: '已离座', icon: 'success' })
+        }
+      },
+    })
+  }
+
+  const handleNoShow = (booking: Booking) => {
+    Taro.showModal({
+      title: '标记爽约',
+      content: `确认将此预约标记为爽约？`,
+      success: (res) => {
+        if (res.confirm) {
+          markNoShow(booking.id)
+          Taro.showToast({ title: '已标记爽约', icon: 'success' })
+        }
+      },
     })
   }
 
@@ -406,6 +462,10 @@ const SchedulePage: React.FC = () => {
                   booking={booking}
                   onCancel={handleCancelBooking}
                   onEdit={handleEditBooking}
+                  onArrived={handleArrived}
+                  onStartUsing={handleStartUsing}
+                  onLeaveEarly={handleLeaveEarly}
+                  onNoShow={handleNoShow}
                 />
               ))
             )}

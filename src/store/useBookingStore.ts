@@ -2,6 +2,8 @@ import { create } from 'zustand'
 import type { Booking, CycleRule, BookingStatus } from '@/types/booking'
 import { bookings as mockBookings, cycleRules as mockCycleRules } from '@/data/bookings'
 import { saveToStorage, loadFromStorage } from '@/utils/persist'
+import { useSeatStore } from './useSeatStore'
+import { useUsageStore } from './useUsageStore'
 import dayjs from 'dayjs'
 
 const BOOKINGS_KEY = 'bookings'
@@ -30,6 +32,10 @@ interface BookingState {
   getCycleRuleById: (ruleId: string) => CycleRule | undefined
   generateCycleBookings: (ruleId: string) => Booking[]
   regenerateCycleBookings: (ruleId: string) => Booking[]
+  markArrived: (bookingId: string) => void
+  startUsing: (bookingId: string) => void
+  leaveEarly: (bookingId: string, reason?: string) => void
+  markNoShow: (bookingId: string) => void
   fetchBookings: () => Promise<void>
   fetchCycleRules: () => Promise<void>
   resetBookingData: () => void
@@ -178,6 +184,60 @@ export const useBookingStore = create<BookingState>((set, get) => ({
     })
 
     return generated
+  },
+
+  markArrived: (bookingId) => {
+    const booking = get().getBookingById(bookingId)
+    if (!booking || (booking.status !== 'upcoming' && booking.status !== 'ongoing')) return
+
+    get().updateBooking(bookingId, { status: 'arrived' as BookingStatus })
+  },
+
+  startUsing: (bookingId) => {
+    const booking = get().getBookingById(bookingId)
+    if (!booking || (booking.status !== 'upcoming' && booking.status !== 'arrived')) return
+
+    get().updateBooking(bookingId, { status: 'ongoing' as BookingStatus })
+
+    const seatStore = useSeatStore.getState()
+    seatStore.occupySeat(booking.seatId)
+
+    const usageStore = useUsageStore.getState()
+    const existing = usageStore.getRecordByBookingId(bookingId)
+    if (!existing) {
+      const expectedEndTime = `${booking.date}T${booking.endTime}:00`
+      usageStore.createRecordFromBooking({
+        bookingId: booking.id,
+        userId: booking.userId,
+        userName: '我',
+        seatId: booking.seatId,
+        seatNumber: booking.seatNumber,
+        expectedEndTime,
+      })
+    }
+  },
+
+  leaveEarly: (bookingId, reason) => {
+    const booking = get().getBookingById(bookingId)
+    if (!booking || booking.status !== 'ongoing') return
+
+    get().updateBooking(bookingId, { status: 'completed' as BookingStatus })
+
+    const seatStore = useSeatStore.getState()
+    seatStore.releaseSeat(booking.seatId)
+
+    const usageStore = useUsageStore.getState()
+    const usage = usageStore.getRecordByBookingId(bookingId)
+    if (usage) {
+      usageStore.finishRecord(usage.id, 'completed', reason || '提前离座')
+    }
+  },
+
+  markNoShow: (bookingId) => {
+    const booking = get().getBookingById(bookingId)
+    if (!booking || booking.status !== 'upcoming') return
+
+    get().updateBooking(bookingId, { status: 'noshow' as BookingStatus })
   },
 
   fetchBookings: async () => {

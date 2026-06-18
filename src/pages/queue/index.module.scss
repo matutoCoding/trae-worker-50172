@@ -603,3 +603,85 @@
   color: $color-text-tertiary;
   margin-top: $spacing-xs;
 }
+
+.usageStatsRow {
+  display: flex;
+  gap: $spacing-sm;
+  margin: $spacing-md 0;
+}
+
+.usageStatItem {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: $spacing-xs;
+  background-color: $color-bg-card;
+  border-radius: $radius-md;
+  padding: $spacing-md $spacing-xs;
+  border: 1rpx solid $color-divider;
+}
+
+.usageStatNum {
+  font-size: $font-size-xl;
+  font-weight: $font-weight-bold;
+  color: $color-primary;
+}
+
+.usageStatLabel {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+}
+
+.usageSectionTitle {
+  margin-bottom: $spacing-sm;
+}
+
+.usageSectionText {
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+  font-weight: $font-weight-medium;
+}
+
+.usageCard {
+  background-color: $color-bg-card;
+  border-radius: $radius-md;
+  padding: $spacing-md;
+  margin-bottom: $spacing-sm;
+  border: 1rpx solid $color-divider;
+  border-left: 6rpx solid $color-primary;
+}
+
+.usageHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: $spacing-sm;
+}
+
+.usageSeatNum {
+  font-size: $font-size-md;
+  font-weight: $font-weight-bold;
+  color: $color-text-primary;
+}
+
+.usageBody {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+}
+
+.usageInfo {
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+}
+
+.usageTime {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+}
+
+.usageReason {
+  font-size: $font-size-xs;
+  color: $color-error;
+}

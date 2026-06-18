@@ -3,6 +3,7 @@ import type { QueueItem, QueueStats, PriorityLevel, QueueStatus } from '@/types/
 import { queueItems as mockQueueItems, queueStats as mockQueueStats, myQueueItem as mockMyQueueItem } from '@/data/queue'
 import { saveToStorage, loadFromStorage, hasStorageKey } from '@/utils/persist'
 import { useSeatStore } from './useSeatStore'
+import { useUsageStore } from './useUsageStore'
 
 const QUEUE_ITEMS_KEY = 'queueItems'
 const MY_QUEUE_KEY = 'myQueueItem'
@@ -100,8 +101,20 @@ export const useQueueStore = create<QueueState>((set, get) => ({
       seatStore.releaseSeat(item.occupiedSeatId)
     }
 
+    if (item?.status === 'seated') {
+      const usageStore = useUsageStore.getState()
+      const usage = usageStore.getRecordByQueueId(queueId)
+      if (usage) {
+        usageStore.finishRecord(usage.id, 'cancelled', '学员主动取消排队')
+      }
+      if (item.occupiedSeatId) {
+        const seatStore = useSeatStore.getState()
+        seatStore.releaseSeat(item.occupiedSeatId)
+      }
+    }
+
     const newQueueItems = get().queueItems.map(q =>
-      q.id === queueId ? { ...q, status: 'cancelled' as QueueStatus } : q
+      q.id === queueId ? { ...q, status: 'cancelled' as QueueStatus, leaveTime: new Date().toISOString() } : q
     )
     const isMyQueue = get().myQueueItem?.id === queueId
 
@@ -181,15 +194,36 @@ export const useQueueStore = create<QueueState>((set, get) => ({
       seatStore.releaseSeat(item.occupiedSeatId)
     }
 
+    if (item?.status === 'called') {
+      const usageStore = useUsageStore.getState()
+      const usage = usageStore.getRecordByQueueId(queueId)
+      if (usage) {
+        usageStore.finishRecord(usage.id, 'timeout', '叫号后5分钟未入座')
+      } else if (item.occupiedSeatId) {
+        usageStore.createRecordFromQueue({
+          queueId: item.id,
+          userId: item.userId,
+          userName: item.userName,
+          seatId: item.occupiedSeatId,
+          seatNumber: item.occupiedSeatNumber || '',
+          queueNumber: item.queueNumber,
+        })
+        const newUsage = usageStore.getRecordByQueueId(item.id)
+        if (newUsage) {
+          usageStore.finishRecord(newUsage.id, 'timeout', '叫号后5分钟未入座')
+        }
+      }
+    }
+
     const newQueueItems = get().queueItems.map(q =>
-      q.id === queueId ? { ...q, status: 'expired' as QueueStatus } : q
+      q.id === queueId ? { ...q, status: 'expired' as QueueStatus, leaveTime: new Date().toISOString() } : q
     )
     const isMyQueue = get().myQueueItem?.id === queueId
 
     set({
       queueItems: newQueueItems,
       myQueueItem: isMyQueue
-        ? { ...get().myQueueItem!, status: 'expired' as QueueStatus }
+        ? { ...get().myQueueItem!, status: 'expired' as QueueStatus, leaveTime: new Date().toISOString() }
         : get().myQueueItem,
     })
     saveToStorage(QUEUE_ITEMS_KEY, newQueueItems)
@@ -197,6 +231,7 @@ export const useQueueStore = create<QueueState>((set, get) => ({
       saveToStorage(MY_QUEUE_KEY, {
         ...get().myQueueItem!,
         status: 'expired',
+        leaveTime: new Date().toISOString(),
       })
     }
     get().recalcStats()
@@ -218,7 +253,7 @@ export const useQueueStore = create<QueueState>((set, get) => ({
 
   getCalledQueue: () =>
     get().queueItems
-      .filter(q => q.status === 'called' || q.status === 'expired')
+      .filter(q => q.status === 'called' || q.status === 'seated' || q.status === 'expired')
       .sort((a, b) => {
         const timeA = a.calledTime ? new Date(a.calledTime).getTime() : 0
         const timeB = b.calledTime ? new Date(b.calledTime).getTime() : 0
@@ -352,6 +387,22 @@ export const useQueueStore = create<QueueState>((set, get) => ({
     if (isMyQueue && get().myQueueItem) {
       saveToStorage(MY_QUEUE_KEY, get().myQueueItem)
     }
+
+    if (item.occupiedSeatId) {
+      const usageStore = useUsageStore.getState()
+      const existing = usageStore.getRecordByQueueId(queueId)
+      if (!existing) {
+        usageStore.createRecordFromQueue({
+          queueId: item.id,
+          userId: item.userId,
+          userName: item.userName,
+          seatId: item.occupiedSeatId,
+          seatNumber: item.occupiedSeatNumber || '',
+          queueNumber: item.queueNumber,
+        })
+      }
+    }
+
     get().recalcStats()
 
     return newQueueItems.find(q => q.id === queueId) || null

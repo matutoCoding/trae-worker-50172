@@ -39,8 +39,10 @@ export const getStatusText = (status: string): string => {
     case 'reserved': return '已预约'
     case 'maintenance': return '维护中'
     case 'upcoming': return '待使用'
-    case 'ongoing': return '进行中'
+    case 'ongoing': return '使用中'
     case 'completed': return '已完成'
+    case 'arrived': return '已到店'
+    case 'noshow': return '爽约'
     default: return status
   }
 }
@@ -59,6 +61,8 @@ export const getStatusColor = (status: string): string => {
     case 'upcoming': return '#165DFF'
     case 'ongoing': return '#00B42A'
     case 'completed': return '#86909C'
+    case 'arrived': return '#FF7D00'
+    case 'noshow': return '#F53F3F'
     default: return '#4E5969'
   }
 }

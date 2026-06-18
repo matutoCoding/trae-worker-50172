@@ -4,10 +4,11 @@ import Taro, { useDidShow } from '@tarojs/taro'
 import classnames from 'classnames'
 import { useQueueStore } from '@/store/useQueueStore'
 import { useUserStore } from '@/store/useUserStore'
+import { useUsageStore } from '@/store/useUsageStore'
 import QueueCard from '@/components/QueueCard'
 import StatusTag from '@/components/StatusTag'
 import Empty from '@/components/Empty'
-import { getPriorityText, getSeatTypeText } from '@/utils/priority'
+import { getPriorityText, getSeatTypeText, getStatusText } from '@/utils/priority'
 import type { QueueItem, PriorityLevel } from '@/types/queue'
 import styles from './index.module.scss'
 
@@ -38,6 +39,8 @@ const QueuePage: React.FC = () => {
 
   const { user, isVip } = useUserStore()
 
+  const { records: usageRecords, fetchRecords: fetchUsageRecords, getUsingRecords, getStats: getUsageStats } = useUsageStore()
+
   const [showModal, setShowModal] = useState(false)
   const [selectedSeatType, setSelectedSeatType] = useState('single')
   const [selectedPriority, setSelectedPriority] = useState<PriorityLevel>('normal')
@@ -48,17 +51,21 @@ const QueuePage: React.FC = () => {
     console.log('[QueuePage] 页面初始化')
     fetchQueue()
     fetchMyQueue()
-  }, [fetchQueue, fetchMyQueue])
+    fetchUsageRecords()
+  }, [fetchQueue, fetchMyQueue, fetchUsageRecords])
 
   useDidShow(() => {
     console.log('[QueuePage] 页面显示，刷新数据')
     fetchQueue()
     fetchMyQueue()
+    fetchUsageRecords()
   })
 
   const priorityQueue = useMemo(() => getPriorityQueue(), [getPriorityQueue])
   const normalQueue = useMemo(() => getNormalQueue(), [getNormalQueue])
   const calledQueue = useMemo(() => getCalledQueue(), [getCalledQueue])
+  const usingRecords = useMemo(() => getUsingRecords(), [getUsingRecords, usageRecords])
+  const usageStats = useMemo(() => getUsageStats(), [getUsageStats, usageRecords])
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -444,6 +451,68 @@ const QueuePage: React.FC = () => {
                   </View>
                 </View>
               ))}
+            </View>
+          )}
+
+          {showStaffMode && (
+            <View className={styles.queueSection}>
+              <View className={styles.queueSectionTitle}>
+                <Text className={styles.sectionIcon}>📝</Text>
+                <Text className={styles.sectionName}>使用记录</Text>
+                <Text className={styles.sectionCount}>{usageStats.totalRecords} 条</Text>
+              </View>
+              {usageStats.totalRecords > 0 && (
+                <View className={styles.usageStatsRow}>
+                  <View className={styles.usageStatItem}>
+                    <Text className={styles.usageStatNum}>{usageStats.usingCount}</Text>
+                    <Text className={styles.usageStatLabel}>使用中</Text>
+                  </View>
+                  <View className={styles.usageStatItem}>
+                    <Text className={styles.usageStatNum}>{usageStats.completedCount}</Text>
+                    <Text className={styles.usageStatLabel}>已完成</Text>
+                  </View>
+                  <View className={styles.usageStatItem}>
+                    <Text className={styles.usageStatNum}>{usageStats.timeoutCount}</Text>
+                    <Text className={styles.usageStatLabel}>超时</Text>
+                  </View>
+                  <View className={styles.usageStatItem}>
+                    <Text className={styles.usageStatNum}>{usageStats.cancelledCount}</Text>
+                    <Text className={styles.usageStatLabel}>取消</Text>
+                  </View>
+                </View>
+              )}
+              {usingRecords.length > 0 && (
+                <View className={styles.usageSectionTitle}>
+                  <Text className={styles.usageSectionText}>当前使用中</Text>
+                </View>
+              )}
+              {usingRecords.slice(0, 5).map(record => (
+                <View key={record.id} className={styles.usageCard}>
+                  <View className={styles.usageHeader}>
+                    <Text className={styles.usageSeatNum}>{record.seatNumber}</Text>
+                    <StatusTag
+                      text={getStatusText(record.status)}
+                      type={record.status === 'using' ? 'success' : 'default'}
+                      size="small"
+                    />
+                  </View>
+                  <View className={styles.usageBody}>
+                    <Text className={styles.usageInfo}>
+                      {record.userName} · {record.source === 'queue' ? `排队${record.queueNumber}号` : '预约到店'}
+                    </Text>
+                    <Text className={styles.usageTime}>
+                      开始: {new Date(record.startTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+                      {record.expectedEndTime && ` · 预计结束: ${new Date(record.expectedEndTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`}
+                    </Text>
+                    {record.leaveReason && (
+                      <Text className={styles.usageReason}>原因: {record.leaveReason}</Text>
+                    )}
+                  </View>
+                </View>
+              ))}
+              {usageStats.totalRecords === 0 && (
+                <Empty text="暂无使用记录" icon="📝" />
+              )}
             </View>
           )}
         </View>

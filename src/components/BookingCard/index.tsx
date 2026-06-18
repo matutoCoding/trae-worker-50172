@@ -12,16 +12,22 @@ interface BookingCardProps {
   booking: Booking
   onCancel?: (booking: Booking) => void
   onEdit?: (booking: Booking) => void
+  onArrived?: (booking: Booking) => void
+  onStartUsing?: (booking: Booking) => void
+  onLeaveEarly?: (booking: Booking) => void
+  onNoShow?: (booking: Booking) => void
   showActions?: boolean
 }
 
-const BookingCard: React.FC<BookingCardProps> = ({ booking, onCancel, onEdit, showActions = true }) => {
+const BookingCard: React.FC<BookingCardProps> = ({ booking, onCancel, onEdit, onArrived, onStartUsing, onLeaveEarly, onNoShow, showActions = true }) => {
   const getStatusType = () => {
     switch (booking.status) {
       case 'ongoing': return 'success'
       case 'upcoming': return 'info'
+      case 'arrived': return 'warning'
       case 'completed': return 'default'
       case 'cancelled': return 'default'
+      case 'noshow': return 'error'
       default: return 'default'
     }
   }
@@ -41,6 +47,11 @@ const BookingCard: React.FC<BookingCardProps> = ({ booking, onCancel, onEdit, sh
       onCancel(booking)
     }
   }
+
+  const handleArrived = () => onArrived?.(booking)
+  const handleStartUsing = () => onStartUsing?.(booking)
+  const handleLeaveEarly = () => onLeaveEarly?.(booking)
+  const handleNoShow = () => onNoShow?.(booking)
 
   const duration = getDurationMinutes(booking.startTime, booking.endTime)
 
@@ -69,15 +80,45 @@ const BookingCard: React.FC<BookingCardProps> = ({ booking, onCancel, onEdit, sh
         </View>
       </View>
 
-      {showActions && (booking.status === 'upcoming' || booking.status === 'ongoing') && (
+      {showActions && (
         <View className={styles.bookingFooter}>
-          <Button className={classnames(styles.actionBtn, styles.cancelBtn)} onClick={handleCancel}>
-            取消预约
-          </Button>
           {booking.status === 'upcoming' && (
-            <Button className={classnames(styles.actionBtn, styles.editBtn)} onClick={handleEdit}>
-              修改时间
-            </Button>
+            <>
+              <Button className={classnames(styles.actionBtn, styles.cancelBtn)} onClick={handleCancel}>
+                取消预约
+              </Button>
+              <Button className={classnames(styles.actionBtn, styles.editBtn)} onClick={handleEdit}>
+                修改
+              </Button>
+              <Button className={classnames(styles.actionBtn, styles.arrivedBtn)} onClick={handleArrived}>
+                到店
+              </Button>
+              {onNoShow && (
+                <Button className={classnames(styles.actionBtn, styles.noshowBtn)} onClick={handleNoShow}>
+                  爽约
+                </Button>
+              )}
+            </>
+          )}
+          {booking.status === 'arrived' && (
+            <>
+              <Button className={classnames(styles.actionBtn, styles.cancelBtn)} onClick={handleCancel}>
+                取消
+              </Button>
+              <Button className={classnames(styles.actionBtn, styles.startBtn)} onClick={handleStartUsing}>
+                开始使用
+              </Button>
+            </>
+          )}
+          {booking.status === 'ongoing' && (
+            <>
+              <Button className={classnames(styles.actionBtn, styles.editBtn)} onClick={handleEdit}>
+                详情
+              </Button>
+              <Button className={classnames(styles.actionBtn, styles.leaveBtn)} onClick={handleLeaveEarly}>
+                提前离座
+              </Button>
+            </>
           )}
         </View>
       )}
