@@ -1,20 +1,25 @@
 import { create } from 'zustand'
-import type { Booking, CycleRule, BookingStatus, CycleFrequency } from '@/types/booking'
+import type { Booking, CycleRule, BookingStatus } from '@/types/booking'
 import { bookings as mockBookings, cycleRules as mockCycleRules } from '@/data/bookings'
+import { saveToStorage, loadFromStorage } from '@/utils/persist'
 import dayjs from 'dayjs'
+
+const BOOKINGS_KEY = 'bookings'
+const CYCLE_RULES_KEY = 'cycleRules'
 
 interface BookingState {
   bookings: Booking[]
   cycleRules: CycleRule[]
   loading: boolean
-  bookingsInitialized: boolean
-  rulesInitialized: boolean
+  bookingsLoaded: boolean
+  rulesLoaded: boolean
 
   setBookings: (bookings: Booking[]) => void
   setCycleRules: (rules: CycleRule[]) => void
   addBooking: (booking: Booking) => void
   updateBooking: (bookingId: string, updates: Partial<Booking>) => void
   cancelBooking: (bookingId: string) => void
+  deleteBookingsByRuleId: (ruleId: string) => void
   addCycleRule: (rule: CycleRule) => void
   updateCycleRule: (ruleId: string, updates: Partial<CycleRule>) => void
   toggleCycleRule: (ruleId: string) => void
@@ -24,54 +29,93 @@ interface BookingState {
   getBookingById: (bookingId: string) => Booking | undefined
   getCycleRuleById: (ruleId: string) => CycleRule | undefined
   generateCycleBookings: (ruleId: string) => Booking[]
+  regenerateCycleBookings: (ruleId: string) => Booking[]
   fetchBookings: () => Promise<void>
   fetchCycleRules: () => Promise<void>
+  resetBookingData: () => void
+  resetRuleData: () => void
 }
 
 export const useBookingStore = create<BookingState>((set, get) => ({
   bookings: [],
   cycleRules: [],
   loading: false,
-  bookingsInitialized: false,
-  rulesInitialized: false,
+  bookingsLoaded: false,
+  rulesLoaded: false,
 
-  setBookings: (bookings) => set({ bookings }),
+  setBookings: (bookings) => {
+    set({ bookings })
+    saveToStorage(BOOKINGS_KEY, bookings)
+  },
 
-  setCycleRules: (rules) => set({ cycleRules: rules }),
+  setCycleRules: (rules) => {
+    set({ cycleRules: rules })
+    saveToStorage(CYCLE_RULES_KEY, rules)
+  },
 
-  addBooking: (booking) =>
-    set((state) => ({ bookings: [booking, ...state.bookings] })),
+  addBooking: (booking) => {
+    set((state) => {
+      const newBookings = [booking, ...state.bookings]
+      saveToStorage(BOOKINGS_KEY, newBookings)
+      return { bookings: newBookings }
+    })
+  },
 
-  updateBooking: (bookingId, updates) =>
-    set((state) => ({
-      bookings: state.bookings.map((b) =>
+  updateBooking: (bookingId, updates) => {
+    set((state) => {
+      const newBookings = state.bookings.map((b) =>
         b.id === bookingId ? { ...b, ...updates, updateTime: new Date().toISOString() } : b
-      ),
-    })),
+      )
+      saveToStorage(BOOKINGS_KEY, newBookings)
+      return { bookings: newBookings }
+    })
+  },
 
-  cancelBooking: (bookingId) =>
-    set((state) => ({
-      bookings: state.bookings.map((b) =>
+  cancelBooking: (bookingId) => {
+    set((state) => {
+      const newBookings = state.bookings.map((b) =>
         b.id === bookingId ? { ...b, status: 'cancelled' as BookingStatus, updateTime: new Date().toISOString() } : b
-      ),
-    })),
+      )
+      saveToStorage(BOOKINGS_KEY, newBookings)
+      return { bookings: newBookings }
+    })
+  },
 
-  addCycleRule: (rule) =>
-    set((state) => ({ cycleRules: [rule, ...state.cycleRules], rulesInitialized: true })),
+  deleteBookingsByRuleId: (ruleId) => {
+    set((state) => {
+      const newBookings = state.bookings.filter((b) => b.cycleRuleId !== ruleId)
+      saveToStorage(BOOKINGS_KEY, newBookings)
+      return { bookings: newBookings }
+    })
+  },
 
-  updateCycleRule: (ruleId, updates) =>
-    set((state) => ({
-      cycleRules: state.cycleRules.map((r) =>
+  addCycleRule: (rule) => {
+    set((state) => {
+      const newRules = [rule, ...state.cycleRules]
+      saveToStorage(CYCLE_RULES_KEY, newRules)
+      return { cycleRules: newRules }
+    })
+  },
+
+  updateCycleRule: (ruleId, updates) => {
+    set((state) => {
+      const newRules = state.cycleRules.map((r) =>
         r.id === ruleId ? { ...r, ...updates } : r
-      ),
-    })),
+      )
+      saveToStorage(CYCLE_RULES_KEY, newRules)
+      return { cycleRules: newRules }
+    })
+  },
 
-  toggleCycleRule: (ruleId) =>
-    set((state) => ({
-      cycleRules: state.cycleRules.map((r) =>
+  toggleCycleRule: (ruleId) => {
+    set((state) => {
+      const newRules = state.cycleRules.map((r) =>
         r.id === ruleId ? { ...r, isActive: !r.isActive } : r
-      ),
-    })),
+      )
+      saveToStorage(CYCLE_RULES_KEY, newRules)
+      return { cycleRules: newRules }
+    })
+  },
 
   getBookingsByDate: (date) =>
     get().bookings.filter((b) => b.date === date && b.status !== 'cancelled'),
@@ -97,7 +141,7 @@ export const useBookingStore = create<BookingState>((set, get) => ({
     const generated: Booking[] = []
     let currentDate = dayjs(rule.startDate)
     const endDate = dayjs(rule.endDate)
-    let bookingIndex = 0
+    let bookingIndex = Date.now()
 
     while (currentDate.isBefore(endDate) || currentDate.isSame(endDate, 'day')) {
       const weekday = currentDate.day()
@@ -123,12 +167,31 @@ export const useBookingStore = create<BookingState>((set, get) => ({
     return generated
   },
 
+  regenerateCycleBookings: (ruleId) => {
+    get().deleteBookingsByRuleId(ruleId)
+    const generated = get().generateCycleBookings(ruleId)
+
+    set((state) => {
+      const newBookings = [...generated, ...state.bookings]
+      saveToStorage(BOOKINGS_KEY, newBookings)
+      return { bookings: newBookings }
+    })
+
+    return generated
+  },
+
   fetchBookings: async () => {
     set({ loading: true })
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    await new Promise((resolve) => setTimeout(resolve, 100))
     const state = get()
-    if (!state.bookingsInitialized) {
-      set({ bookings: mockBookings, bookingsInitialized: true, loading: false })
+    if (!state.bookingsLoaded) {
+      const stored = loadFromStorage<Booking[]>(BOOKINGS_KEY, [])
+      if (stored && stored.length > 0) {
+        set({ bookings: stored, bookingsLoaded: true, loading: false })
+      } else {
+        set({ bookings: mockBookings, bookingsLoaded: true, loading: false })
+        saveToStorage(BOOKINGS_KEY, mockBookings)
+      }
     } else {
       set({ loading: false })
     }
@@ -136,12 +199,28 @@ export const useBookingStore = create<BookingState>((set, get) => ({
 
   fetchCycleRules: async () => {
     set({ loading: true })
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    await new Promise((resolve) => setTimeout(resolve, 100))
     const state = get()
-    if (!state.rulesInitialized) {
-      set({ cycleRules: mockCycleRules, rulesInitialized: true, loading: false })
+    if (!state.rulesLoaded) {
+      const stored = loadFromStorage<CycleRule[]>(CYCLE_RULES_KEY, [])
+      if (stored && stored.length > 0) {
+        set({ cycleRules: stored, rulesLoaded: true, loading: false })
+      } else {
+        set({ cycleRules: mockCycleRules, rulesLoaded: true, loading: false })
+        saveToStorage(CYCLE_RULES_KEY, mockCycleRules)
+      }
     } else {
       set({ loading: false })
     }
+  },
+
+  resetBookingData: () => {
+    set({ bookings: mockBookings, bookingsLoaded: true })
+    saveToStorage(BOOKINGS_KEY, mockBookings)
+  },
+
+  resetRuleData: () => {
+    set({ cycleRules: mockCycleRules, rulesLoaded: true })
+    saveToStorage(CYCLE_RULES_KEY, mockCycleRules)
   },
 }))

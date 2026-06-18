@@ -35,7 +35,7 @@ const timeSlots = [
 const CycleRulePage: React.FC = () => {
   const router = useRouter()
   const { seats, getSeatById } = useSeatStore()
-  const { addCycleRule, updateCycleRule, cycleRules, generateCycleBookings, addBooking, bookings, getCycleRuleById } = useBookingStore()
+  const { addCycleRule, updateCycleRule, cycleRules, generateCycleBookings, regenerateCycleBookings, addBooking, bookings, getCycleRuleById } = useBookingStore()
 
   const [selectedSeat, setSelectedSeat] = useState<Seat | null>(null)
   const [frequency, setFrequency] = useState<CycleFrequency>('weekly')
@@ -228,22 +228,14 @@ const CycleRulePage: React.FC = () => {
       if (seatChanged || scheduleChanged) {
         Taro.showModal({
           title: '修改成功',
-          content: `规则已更新，是否重新生成 ${estimatedCount} 条预约？\n（原预约如未使用建议取消）`,
+          content: `规则已更新，是否重新生成 ${estimatedCount} 条预约？\n（将覆盖该规则下所有原预约）`,
           confirmText: '重新生成',
           cancelText: '暂不生成',
           success: (res) => {
             if (res.confirm) {
-              const generated = generateCycleBookings(editingId)
-              generated.forEach(booking => {
-                const exists = bookings.some(
-                  b => b.date === booking.date && b.seatId === booking.seatId && b.cycleRuleId === editingId
-                )
-                if (!exists) {
-                  addBooking(booking)
-                }
-              })
+              const generated = regenerateCycleBookings(editingId)
               Taro.showToast({
-                title: `已生成 ${generated.length} 条预约`,
+                title: `已重新生成 ${generated.length} 条预约`,
                 icon: 'success',
               })
             } else {

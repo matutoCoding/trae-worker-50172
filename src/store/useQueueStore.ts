@@ -1,14 +1,19 @@
 import { create } from 'zustand'
 import type { QueueItem, QueueStats, PriorityLevel, QueueStatus } from '@/types/queue'
 import { queueItems as mockQueueItems, queueStats as mockQueueStats, myQueueItem as mockMyQueueItem } from '@/data/queue'
+import { saveToStorage, loadFromStorage } from '@/utils/persist'
+import { useSeatStore } from './useSeatStore'
+
+const QUEUE_ITEMS_KEY = 'queueItems'
+const MY_QUEUE_KEY = 'myQueueItem'
 
 interface QueueState {
   queueItems: QueueItem[]
   queueStats: QueueStats
   myQueueItem: QueueItem | null
   loading: boolean
-  queueInitialized: boolean
-  myQueueInitialized: boolean
+  queueLoaded: boolean
+  myQueueLoaded: boolean
 
   setQueueItems: (items: QueueItem[]) => void
   setQueueStats: (stats: QueueStats) => void
@@ -22,8 +27,11 @@ interface QueueState {
   getCalledQueue: () => QueueItem[]
   getWaitingCount: () => number
   updateQueueStatus: (queueId: string, status: QueueStatus) => void
+  recalcStats: () => void
   fetchQueue: () => Promise<void>
   fetchMyQueue: () => Promise<void>
+  resetQueueData: () => void
+  occupySeatForQueue: (queueId: string, seatId: string) => void
 }
 
 const getPriorityWeight = (priority: PriorityLevel): number => {
@@ -40,16 +48,24 @@ export const useQueueStore = create<QueueState>((set, get) => ({
   queueStats: mockQueueStats,
   myQueueItem: null,
   loading: false,
-  queueInitialized: false,
-  myQueueInitialized: false,
+  queueLoaded: false,
+  myQueueLoaded: false,
 
-  setQueueItems: (items) => set({ queueItems: items }),
+  setQueueItems: (items) => {
+    set({ queueItems: items })
+    saveToStorage(QUEUE_ITEMS_KEY, items)
+    get().recalcStats()
+  },
 
   setQueueStats: (stats) => set({ queueStats: stats }),
 
-  setMyQueueItem: (item) => set({ myQueueItem: item }),
+  setMyQueueItem: (item) => {
+    set({ myQueueItem: item })
+    saveToStorage(MY_QUEUE_KEY, item)
+  },
 
   joinQueue: async (seatType, priority) => {
+    const waitingItems = get().queueItems.filter(q => q.status === 'waiting')
     const newItem: QueueItem = {
       id: `queue-${Date.now()}`,
       userId: 'user-1',
@@ -57,43 +73,47 @@ export const useQueueStore = create<QueueState>((set, get) => ({
       seatType,
       priority,
       status: 'waiting',
-      queueNumber: get().queueItems.filter(q => q.status === 'waiting').length + 1,
+      queueNumber: waitingItems.length + 1,
       joinTime: new Date().toISOString(),
       expectedWaitTime: priority === 'vip' ? 15 : 45,
       isVip: priority === 'vip' || priority === 'emergency',
     }
 
-    set((state) => ({
-      queueItems: [...state.queueItems, newItem],
+    const newQueueItems = [...get().queueItems, newItem]
+    set({
+      queueItems: newQueueItems,
       myQueueItem: newItem,
-      myQueueInitialized: true,
-      queueStats: {
-        ...state.queueStats,
-        totalWaiting: state.queueStats.totalWaiting + 1,
-        vipWaiting: state.queueStats.vipWaiting + (newItem.isVip ? 1 : 0),
-        normalWaiting: state.queueStats.normalWaiting + (newItem.isVip ? 0 : 1),
-      },
-    }))
+      myQueueLoaded: true,
+    })
+    saveToStorage(QUEUE_ITEMS_KEY, newQueueItems)
+    saveToStorage(MY_QUEUE_KEY, newItem)
+    get().recalcStats()
 
     return newItem
   },
 
   leaveQueue: (queueId) => {
-    set((state) => {
-      const item = state.queueItems.find(q => q.id === queueId)
-      const wasMyQueue = state.myQueueItem?.id === queueId
-      return {
-        queueItems: state.queueItems.filter(q => q.id !== queueId),
-        myQueueItem: wasMyQueue ? null : state.myQueueItem,
-        myQueueInitialized: true,
-        queueStats: {
-          ...state.queueStats,
-          totalWaiting: Math.max(0, state.queueStats.totalWaiting - 1),
-          vipWaiting: Math.max(0, state.queueStats.vipWaiting - (item?.isVip ? 1 : 0)),
-          normalWaiting: Math.max(0, state.queueStats.normalWaiting - (item?.isVip ? 0 : 1)),
-        },
-      }
+    const item = get().queueItems.find(q => q.id === queueId)
+    if (item?.occupiedSeatId && item.status === 'called') {
+      const seatStore = useSeatStore.getState()
+      seatStore.releaseSeat(item.occupiedSeatId)
+    }
+
+    const newQueueItems = get().queueItems.map(q =>
+      q.id === queueId ? { ...q, status: 'cancelled' as QueueStatus } : q
+    )
+    const isMyQueue = get().myQueueItem?.id === queueId
+
+    set({
+      queueItems: newQueueItems,
+      myQueueItem: isMyQueue ? null : get().myQueueItem,
+      myQueueLoaded: true,
     })
+    saveToStorage(QUEUE_ITEMS_KEY, newQueueItems)
+    if (isMyQueue) {
+      saveToStorage(MY_QUEUE_KEY, null)
+    }
+    get().recalcStats()
   },
 
   callNext: () => {
@@ -108,48 +128,72 @@ export const useQueueStore = create<QueueState>((set, get) => ({
     if (waitingItems.length === 0) return null
 
     const nextItem = waitingItems[0]
-    set((state) => ({
-      queueItems: state.queueItems.map(q =>
-        q.id === nextItem.id
-          ? { ...q, status: 'called' as QueueStatus, calledTime: new Date().toISOString() }
-          : q
-      ),
-      myQueueItem: state.myQueueItem?.id === nextItem.id
-        ? { ...state.myQueueItem, status: 'called' as QueueStatus, calledTime: new Date().toISOString() }
-        : state.myQueueItem,
-      queueStats: {
-        ...state.queueStats,
-        totalWaiting: Math.max(0, state.queueStats.totalWaiting - 1),
-        vipWaiting: Math.max(0, state.queueStats.vipWaiting - (nextItem.isVip ? 1 : 0)),
-        normalWaiting: Math.max(0, state.queueStats.normalWaiting - (nextItem.isVip ? 0 : 1)),
-      },
-    }))
-    return nextItem
+
+    const seatStore = useSeatStore.getState()
+    const availableSeat = seatStore.getAvailableSeatByType(nextItem.seatType || 'single')
+
+    let occupiedSeatId: string | undefined
+    let occupiedSeatNumber: string | undefined
+    if (availableSeat) {
+      seatStore.occupySeat(availableSeat.id)
+      occupiedSeatId = availableSeat.id
+      occupiedSeatNumber = availableSeat.seatNumber
+    }
+
+    const newQueueItems = get().queueItems.map(q =>
+      q.id === nextItem.id
+        ? {
+            ...q,
+            status: 'called' as QueueStatus,
+            calledTime: new Date().toISOString(),
+            occupiedSeatId,
+            occupiedSeatNumber,
+          }
+        : q
+    )
+    const isMyQueue = get().myQueueItem?.id === nextItem.id
+
+    const calledItem = newQueueItems.find(q => q.id === nextItem.id)!
+
+    set({
+      queueItems: newQueueItems,
+      myQueueItem: isMyQueue ? { ...calledItem } : get().myQueueItem,
+    })
+    saveToStorage(QUEUE_ITEMS_KEY, newQueueItems)
+    if (isMyQueue) {
+      saveToStorage(MY_QUEUE_KEY, calledItem)
+    }
+    get().recalcStats()
+
+    return calledItem
   },
 
   expireQueue: (queueId) => {
-    set((state) => {
-      const item = state.queueItems.find(q => q.id === queueId)
-      return {
-        queueItems: state.queueItems.map(q =>
-          q.id === queueId
-            ? { ...q, status: 'expired' as QueueStatus }
-            : q
-        ),
-        myQueueItem: state.myQueueItem?.id === queueId
-          ? { ...state.myQueueItem, status: 'expired' as QueueStatus }
-          : state.myQueueItem,
-        queueStats: item?.isVip
-          ? {
-              ...state.queueStats,
-              vipWaiting: Math.max(0, state.queueStats.vipWaiting - 1),
-            }
-          : {
-              ...state.queueStats,
-              normalWaiting: Math.max(0, state.queueStats.normalWaiting - 1),
-            },
-      }
+    const item = get().queueItems.find(q => q.id === queueId)
+    if (item?.occupiedSeatId) {
+      const seatStore = useSeatStore.getState()
+      seatStore.releaseSeat(item.occupiedSeatId)
+    }
+
+    const newQueueItems = get().queueItems.map(q =>
+      q.id === queueId ? { ...q, status: 'expired' as QueueStatus } : q
+    )
+    const isMyQueue = get().myQueueItem?.id === queueId
+
+    set({
+      queueItems: newQueueItems,
+      myQueueItem: isMyQueue
+        ? { ...get().myQueueItem!, status: 'expired' as QueueStatus }
+        : get().myQueueItem,
     })
+    saveToStorage(QUEUE_ITEMS_KEY, newQueueItems)
+    if (isMyQueue) {
+      saveToStorage(MY_QUEUE_KEY, {
+        ...get().myQueueItem!,
+        status: 'expired',
+      })
+    }
+    get().recalcStats()
   },
 
   getPriorityQueue: () =>
@@ -178,37 +222,104 @@ export const useQueueStore = create<QueueState>((set, get) => ({
   getWaitingCount: () =>
     get().queueItems.filter(q => q.status === 'waiting').length,
 
-  updateQueueStatus: (queueId, status) =>
-    set((state) => ({
-      queueItems: state.queueItems.map(q =>
-        q.id === queueId
-          ? { ...q, status, calledTime: status === 'called' ? new Date().toISOString() : q.calledTime }
-          : q
-      ),
-      myQueueItem: state.myQueueItem?.id === queueId
-        ? { ...state.myQueueItem, status, calledTime: status === 'called' ? new Date().toISOString() : state.myQueueItem.calledTime }
-        : state.myQueueItem,
-    })),
+  updateQueueStatus: (queueId, status) => {
+    const newQueueItems = get().queueItems.map(q =>
+      q.id === queueId
+        ? { ...q, status, calledTime: status === 'called' ? new Date().toISOString() : q.calledTime }
+        : q
+    )
+    const isMyQueue = get().myQueueItem?.id === queueId
+
+    set({
+      queueItems: newQueueItems,
+      myQueueItem: isMyQueue
+        ? {
+            ...get().myQueueItem!,
+            status,
+            calledTime: status === 'called' ? new Date().toISOString() : get().myQueueItem?.calledTime,
+          }
+        : get().myQueueItem,
+    })
+    saveToStorage(QUEUE_ITEMS_KEY, newQueueItems)
+    if (isMyQueue && get().myQueueItem) {
+      saveToStorage(MY_QUEUE_KEY, get().myQueueItem)
+    }
+  },
+
+  recalcStats: () => {
+    const items = get().queueItems
+    const totalWaiting = items.filter(q => q.status === 'waiting').length
+    const vipWaiting = items.filter(q => q.status === 'waiting' && (q.priority === 'vip' || q.priority === 'emergency')).length
+    const normalWaiting = items.filter(q => q.status === 'waiting' && q.priority === 'normal').length
+    const avgWaitTime = totalWaiting > 0
+      ? Math.round(items.filter(q => q.status === 'waiting').reduce((sum, q) => sum + q.expectedWaitTime, 0) / totalWaiting)
+      : 0
+
+    const seatStore = useSeatStore.getState()
+    const availableSeats = seatStore.getAvailableSeatsCount()
+
+    set({
+      queueStats: {
+        ...get().queueStats,
+        totalWaiting,
+        vipWaiting,
+        normalWaiting,
+        avgWaitTime,
+        availableSeats,
+      },
+    })
+  },
 
   fetchQueue: async () => {
     set({ loading: true })
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    await new Promise((resolve) => setTimeout(resolve, 100))
     const state = get()
-    if (!state.queueInitialized) {
-      set({ queueItems: mockQueueItems, queueStats: mockQueueStats, queueInitialized: true, loading: false })
+    if (!state.queueLoaded) {
+      const stored = loadFromStorage<QueueItem[]>(QUEUE_ITEMS_KEY, [])
+      if (stored && stored.length > 0) {
+        set({ queueItems: stored, queueLoaded: true, loading: false })
+        get().recalcStats()
+      } else {
+        set({ queueItems: mockQueueItems, queueLoaded: true, loading: false })
+        saveToStorage(QUEUE_ITEMS_KEY, mockQueueItems)
+        get().recalcStats()
+      }
     } else {
       set({ loading: false })
+      get().recalcStats()
     }
   },
 
   fetchMyQueue: async () => {
     set({ loading: true })
-    await new Promise((resolve) => setTimeout(resolve, 100))
+    await new Promise((resolve) => setTimeout(resolve, 50))
     const state = get()
-    if (!state.myQueueInitialized) {
-      set({ myQueueItem: mockMyQueueItem, myQueueInitialized: true, loading: false })
+    if (!state.myQueueLoaded) {
+      const stored = loadFromStorage<QueueItem | null>(MY_QUEUE_KEY, null)
+      if (stored) {
+        set({ myQueueItem: stored, myQueueLoaded: true, loading: false })
+      } else {
+        set({ myQueueItem: mockMyQueueItem, myQueueLoaded: true, loading: false })
+        saveToStorage(MY_QUEUE_KEY, mockMyQueueItem)
+      }
     } else {
       set({ loading: false })
     }
+  },
+
+  resetQueueData: () => {
+    set({
+      queueItems: mockQueueItems,
+      myQueueItem: mockMyQueueItem,
+      queueLoaded: true,
+      myQueueLoaded: true,
+    })
+    saveToStorage(QUEUE_ITEMS_KEY, mockQueueItems)
+    saveToStorage(MY_QUEUE_KEY, mockMyQueueItem)
+    get().recalcStats()
+  },
+
+  occupySeatForQueue: (queueId, seatId) => {
+    console.log('[Queue] 占位座位:', { queueId, seatId })
   },
 }))

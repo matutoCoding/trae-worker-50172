@@ -143,9 +143,12 @@ const QueuePage: React.FC = () => {
     const next = callNext()
     if (next) {
       const priorityText = next.priority === 'emergency' ? '【应急】' : next.priority === 'vip' ? '【VIP】' : ''
+      const seatText = next.occupiedSeatNumber
+        ? `\n分配座位: ${next.occupiedSeatNumber}号`
+        : `\n座位类型: ${getSeatTypeText(next.seatType)}\n（暂无可用同类型座位）`
       Taro.showModal({
         title: '叫号成功',
-        content: `${priorityText}请 ${next.queueNumber} 号用户\n${next.userName}\n前往入座\n座位类型: ${getSeatTypeText(next.seatType)}\n\n5分钟内未入座将自动释放`,
+        content: `${priorityText}请 ${next.queueNumber} 号用户\n${next.userName}${seatText}\n\n5分钟内未入座将自动释放`,
         showCancel: false,
         confirmText: '知道了',
       })
@@ -369,6 +372,7 @@ const QueuePage: React.FC = () => {
                       />
                     </View>
                     <Text className={styles.calledInfo}>
+                      {item.occupiedSeatNumber ? `${item.occupiedSeatNumber}号 · ` : ''}
                       {getSeatTypeText(item.seatType)} · {item.calledTime ? new Date(item.calledTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '--'}
                     </Text>
                   </View>

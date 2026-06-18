@@ -14,6 +14,8 @@ export interface QueueItem {
   calledTime?: string
   expectedWaitTime: number
   isVip: boolean
+  occupiedSeatId?: string
+  occupiedSeatNumber?: string
 }
 
 export interface QueueStats {
